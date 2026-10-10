@@ -1,0 +1,25 @@
+{
+  "name": "furigana-overlay-browser",
+  "version": "0.3.0",
+  "description": "Automatic offline viewport-bounded furigana overlays",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc",
+    "test": "playwright test"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "UNLICENSED",
+  "type": "commonjs",
+  "dependencies": {
+    "kuromoji": "^0.1.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.0",
+    "@types/chrome": "^0.3.5",
+    "@types/kuromoji": "^0.1.3",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2"
+  },
+  "private": true
+}
