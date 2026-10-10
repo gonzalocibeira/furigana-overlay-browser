@@ -8,6 +8,10 @@ Enable the extension and readings appear as you browse. No “add furigana” bu
 
 The ready-to-load extension is included in **[`dist/`](dist/)**. This project is distributed through GitHub, **not the Chrome Web Store**.
 
+## Why I built this
+
+I built this because I couldn't find a good option for adding furigana in Google Docs. I wanted readings to appear automatically, work offline, and leave the original document unchanged. That need grew into this extension, with webpage support and an optional reading view that gives furigana more room.
+
 ## Screenshots
 
 ### Automatic readings on a webpage
@@ -138,6 +142,10 @@ The test suite has **20 tests**, including automatic annotations, unchanged sour
 
 Screenshots are preserved in [`docs/screenshots/`](docs/screenshots/). Regenerated browser captures are written to `test-results/` during tests.
 
-## Third-party notices
+## License
 
-Bundled dependency licenses are included in [`dist/licenses/`](dist/licenses/), including Kuromoji (Apache 2.0), IPADIC's notice, async, doublearray, zlibjs, and lodash. Project code currently has no open-source license grant (`UNLICENSED` in `package.json`).
+Project code is licensed under the [MIT License](LICENSE). You can use, modify, and redistribute it under those terms.
+
+### Third-party notices
+
+Bundled dependency licenses are included in [`dist/licenses/`](dist/licenses/), including Kuromoji (Apache 2.0), IPADIC's notice, async, doublearray, zlibjs, and lodash. These dependencies retain their own licenses; the project MIT license does not replace them.

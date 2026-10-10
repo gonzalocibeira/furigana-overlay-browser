@@ -8,6 +8,7 @@ await cp('public','dist',{recursive:true});
 await buildIcons('dist/icons');
 await writeFile('dist/README.md',(await readFile('README.md','utf8')).replaceAll('public/icons/logo.svg','icons/logo.svg').replaceAll('](dist/','](').replaceAll('**`dist` folder**','**extension folder**'));
 await cp('docs','dist/docs',{recursive:true});
+await cp('LICENSE','dist/LICENSE');
 await cp('node_modules/kuromoji/dict','dist/dict',{recursive:true});
 await mkdir('dist/licenses',{recursive:true});
 for (const name of ['LICENSE-2.0.txt','NOTICE.md']) await cp(`node_modules/kuromoji/${name}`,`dist/licenses/kuromoji-${name}`);
