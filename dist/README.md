@@ -1,48 +1,42 @@
-<p align="center"><img src="icons/logo.svg" alt="字 with じ furigana" width="88"></p>
+<p align="center">
+  <img src="icons/logo.svg" alt="字 with じ furigana" width="88">
+</p>
 
-# Furigana Overlay Browser
+<h1 align="center">Furigana Overlay Browser</h1>
+<p align="center"><strong>A little help above the kanji.</strong></p>
+<p align="center">Automatic Japanese readings for webpages and Google Docs.<br>Processed on your device, with the dictionary included.</p>
+<p align="center">
+  <a href="#install-in-chrome">Install in Chrome</a> ·
+  <a href="#see-it-in-action">See it in action</a> ·
+  <a href="#make-it-yours">Make it yours</a> ·
+  <a href="#help-and-compatibility">Get help</a>
+</p>
 
-**Automatic, offline furigana for Japanese webpages and Google Docs.**
+![Furigana above Japanese text on Wikipedia, with the extension menu showing automatic readings enabled](docs/screenshots/webpage-live.png)
 
-Enable the extension and readings appear as you browse. No “add furigana” button, account, API key, external processing service, or dictionary download. Original webpage text and Google Docs formatting stay unchanged.
+<p align="center"><em>Read Japanese where you already browse. Readings appear automatically above the kanji.</em></p>
 
-The ready-to-load extension is included in **[`dist/`]()**. This project is distributed through GitHub, **not the Chrome Web Store**.
+| Read as you browse | Keep your work intact | Stay in control |
+| --- | --- | --- |
+| Furigana appears automatically on visible Japanese text. | Original webpage text and Google Docs formatting stay unchanged. | Pause a site, adjust the appearance, or save your own readings. |
+| **Offline processing** with a bundled dictionary. | **Google Docs support** with an optional extra-space reading panel. | **No account or API key** needed. Settings and corrections stay on this device. |
 
-## Why I built this
+## Install in Chrome
 
-I built this because I couldn't find a good option for adding furigana in Google Docs. I wanted readings to appear automatically, work offline, and leave the original document unchanged. That need grew into this extension, with webpage support and an optional reading view that gives furigana more room.
+**Download → Extract → Load `dist` → Start reading.** No Node.js, npm, or build step needed.
 
-## Screenshots
+The ready-to-load **Furigana Overlay Browser** extension is included in [`dist/`](). It is distributed through GitHub, not the Chrome Web Store.
 
-### Automatic readings on a webpage
+1. **Download this repository.** Click **Code → Download ZIP** at the top of the GitHub page. For a private repository, sign in with an account that has access.
+2. **Extract and keep the folder.** Put it somewhere permanent, such as `Documents/Furigana`.
+3. **Open Chrome's extensions page.** Enter `chrome://extensions` in the address bar and turn on **Developer mode**.
+4. **Load the extension.** Click **Load unpacked** and select the **extension folder** inside the extracted repository. It contains `manifest.json`.
+5. **Reload your tabs and read.** Furigana starts automatically. The first page may take a moment while the local dictionary loads.
 
-![Furigana automatically displayed above Japanese text](docs/screenshots/webpage.png)
+**Tip:** Pin **Furigana Overlay Browser** from Chrome's puzzle-piece **Extensions** menu. Look for **字** with **じ** above it.
 
-### Extension menu
-
-<img src="docs/screenshots/popup.png" alt="Popup with automatic readings, site pause, appearance settings, and local corrections" width="344">
-
-### Extra-space Google Docs reading view
-
-![Separate reading panel with extra line spacing and furigana](docs/screenshots/docs-reading-view.png)
-
-These are screenshots of the actual extension running in a Chromium-based browser. The webpage and Google Docs examples use local test fixtures. The Docs screenshot is **not a live signed-in Google document**; live Docs compatibility remains experimental.
-
-## Install in Chrome — no Web Store required
-
-You do **not** need Node.js, npm, a developer account, or a build step.
-
-1. At the top of this GitHub repository, click **Code → Download ZIP**. If the repository is private, sign in with an account that has access first.
-2. **Extract the ZIP** into a folder you will keep, such as `Documents/Furigana`. Chrome loads the extension from this folder, so do not delete or move it afterward.
-3. In Chrome, type **`chrome://extensions`** into the address bar and press Enter.
-4. Turn on **Developer mode** in the upper-right corner.
-5. Click **Load unpacked**.
-6. Open the extracted repository folder and select its **extension folder**. Select the folder containing `manifest.json`, not the ZIP or the repository's top-level folder.
-7. Confirm that **Furigana Overlay Browser** appears and is enabled.
-8. Reload existing webpages and Google Docs tabs. Furigana starts automatically. The first page may take a moment while the local dictionary loads.
-9. To keep the menu handy, click Chrome's **Extensions** puzzle-piece icon and pin **Furigana Overlay Browser**. Its icon is **字** with **じ** above it.
-
-The folder to select looks like this:
+<details>
+<summary><strong>Which folder should I select?</strong></summary>
 
 ```text
 furigana-overlay-browser-<branch>/
@@ -56,36 +50,56 @@ furigana-overlay-browser-<branch>/
     └── icons/
 ```
 
-Keep Developer mode enabled for this unpacked installation. Managed work or school browsers may restrict loading unpacked extensions; the browser administrator controls that policy. These steps follow [Chrome's official instructions for loading unpacked extensions](https://developer.chrome.com/docs/extensions/get-started/tutorial/hello-world#load-unpacked).
+Select the extracted folder containing `manifest.json`, not the ZIP or repository root. Keep that folder in place and leave Developer mode enabled. Managed work or school browsers may restrict unpacked extensions.
 
-## Use it
+See [Chrome's official instructions for loading unpacked extensions](https://developer.chrome.com/docs/extensions/get-started/tutorial/hello-world#load-unpacked).
 
-- **Automatic readings:** the main switch enables or pauses the extension globally.
-- **Pause on this site:** excludes the current hostname without affecting other sites.
-- **Reading appearance:** choose Small, Default, Large, or Extra large furigana, and page colors or high contrast. Preferences are saved separately for each hostname.
-- **Local reading corrections:** save, edit, or remove readings for names or words. Enter hiragana or katakana; readings display in hiragana. Corrections apply automatically across sites and stay on this device. Up to 200 corrections are supported.
-- **Page status:** explains tight spacing, unknown words, unavailable Docs text, and waiting while you scroll or edit.
+</details>
 
-Overlay readings shrink or are omitted where necessary to preserve the original line spacing. Reading size is a preference, not a guarantee that larger text will fit.
+## See it in action
 
-## Google Docs and extra line spacing
+### On the web
 
-The normal overlay processes **only the active page's visible text**. In pageless documents, it processes the editor viewport. It never analyzes every page in a long document.
+The Wikipedia example above shows furigana added directly above Japanese text. Open the extension menu to pause a site, customize readings, or check the page status.
 
-To give furigana more room:
+### In Google Docs
+
+Readings appear over the visible document text while you keep working in the original editor.
+
+![A live Google Doc with furigana above Japanese sentences and the extension menu open](docs/screenshots/google-docs-live.png)
+
+### More room to read
+
+Open the optional **Extra-space reading view** for a separate, selectable panel with roomier spacing. Your document keeps its original layout.
+
+![Google Docs beside the extension's reading panel, showing larger Japanese text and furigana with extra line spacing](docs/screenshots/google-docs-reading-view-live.png)
 
 1. Open a Google Doc and click the extension icon.
-2. Expand **Google Docs reading view**.
-3. Enable **Extra-space reading view**.
-4. Choose **Comfortable**, **Roomy**, or **Spacious** line spacing.
+2. Expand **Google Docs reading view** and enable **Extra-space reading view**.
+3. Choose **Comfortable**, **Roomy**, or **Spacious** line spacing.
 
-A separate, selectable reading panel appears automatically and follows the active page as you scroll or edit. Continue editing in the original Docs editor. The panel replaces the extension's overlay while active; it does **not** change the document's formatting or line spacing. Click **Close** on the panel, or turn off the option, to restore overlays.
+The panel follows the active page as you scroll or edit. Continue editing in Docs; click **Close** on the panel to return to overlay readings. The setting is saved across your Google Docs documents.
 
-The panel is a **text-only view**. Tables and formatting may be simplified, and images are omitted. The reading-view setting is saved for Google Docs and applies across your documents.
+These screenshots show real use on Japanese Wikipedia and in Google Docs. **Google Docs support is experimental**; compatibility can vary as Google's editor changes. The reading panel is text-only: tables and formatting may be simplified, and images are omitted.
 
-**Docs support is experimental.** It depends on undocumented annotated SVG text geometry supplied by Google's canvas editor. Google can change or omit that surface. The panel and overlays use the same extraction method, so the panel cannot recover text when that geometry is unavailable. Browser tests cover paged and pageless fixtures, editing, IME input, and page switching; they do not guarantee compatibility with every live Google Doc.
+## Make it yours
 
-## Privacy and permissions
+| In the extension menu | What you can do |
+| --- | --- |
+| **Automatic readings** | Turn readings on or pause them everywhere. |
+| **Pause on this site** | Pause the current hostname while keeping other sites active. |
+| **Reading appearance** | Choose Small, Default, Large, or Extra large readings, with page colors or high contrast. Preferences are saved per hostname. |
+| **Local reading corrections** | Save, edit, or remove preferred readings for names and words. Enter hiragana or katakana; readings display in hiragana. Up to 200 corrections apply across sites. |
+| **On this page** | Check reading status, including tight spacing or unavailable Docs text. |
+
+Readings shrink or are omitted when space is tight to preserve the original line spacing. Try a smaller reading size or the extra-space Docs panel when you need more room.
+
+## Private by design
+
+**Japanese text is processed on your device.** The extension uses bundled Kuromoji/IPADIC dictionaries, with no external processing service, analytics, account, or runtime dictionary download. Only your settings and saved corrections are persisted.
+
+<details>
+<summary><strong>Permissions and local storage explained</strong></summary>
 
 Japanese text is processed locally with bundled Kuromoji/IPADIC dictionaries in an extension worker. There are no external API calls, analytics, accounts, or runtime dictionary downloads.
 
@@ -97,15 +111,12 @@ Japanese text is processed locally with bundled Kuromoji/IPADIC dictionaries in 
 
 Original text nodes, editor values, and document formatting remain unchanged. Overlays ignore mouse input and are hidden during printing. The separate reading panel allows text selection and is also hidden in print.
 
-## Update or uninstall
+</details>
 
-There are **no automatic Web Store updates**.
+## Help and compatibility
 
-To update, download and extract the latest repository ZIP, replace the contents of your existing extension folder with the new version, then click the extension's **Reload** icon on `chrome://extensions`. Reload open webpages and Google Docs tabs too. Keeping the same folder and reloading the existing installation helps retain your local preferences and corrections.
-
-To uninstall, click **Remove** on the extension's card in `chrome://extensions`. You can then delete its local folder.
-
-## Troubleshooting
+<details>
+<summary><strong>Missing readings, incorrect names, or installation trouble?</strong></summary>
 
 | Symptom | What to check |
 | --- | --- |
@@ -119,13 +130,38 @@ To uninstall, click **Remove** on the extension's card in `chrome://extensions`.
 
 Webpage text inside editable controls or existing ruby is skipped. Vertical writing, rotated text, closed shadow roots, and words fragmented across lines are unsupported. Very dense or complex viewports can exceed discovery limits.
 
-## Performance
+</details>
 
-Work is bounded to visible content. Processing pauses in background tabs, waits for scrolling/editing to settle, and cancels stale queued work. Docs measurements are cached within each scan; collision checks inspect nearby glyphs. Dictionary caches and analysis batches have fixed limits. The reading panel is capped at 16,000 characters / 2,000 runs and 500 reading candidates.
+<details>
+<summary><strong>How Google Docs support works</strong></summary>
 
-See [technical notes](docs/technical-notes.md) for the architecture, exact budgets, and compatibility details.
+The overlay processes only the active page's visible text, or the editor viewport in pageless documents. It does not analyze every page in a long document. The reading panel replaces overlays while active and does not change document formatting or line spacing.
 
-## Build and test
+Docs support depends on undocumented annotated SVG text geometry supplied by Google's canvas editor. Google can change or omit that surface. The reading panel and overlays use the same extraction method, so the panel cannot recover text when that geometry is unavailable.
+
+Browser tests cover paged and pageless fixtures, editing, IME input, and page switching; they do not guarantee compatibility with every live Google Doc.
+
+</details>
+
+<details>
+<summary><strong>Update or uninstall</strong></summary>
+
+There are no automatic Web Store updates.
+
+**To update:** Download and extract the latest repository ZIP, replace the contents of your existing extension folder, then click the extension's **Reload** icon on `chrome://extensions`. Reload open webpages and Google Docs tabs too. Keeping the same folder and reloading the existing installation helps retain preferences and corrections.
+
+**To uninstall:** Click **Remove** on the extension's card in `chrome://extensions`. You can then delete its local folder.
+
+</details>
+
+## Why I built this
+
+I couldn't find a good option for adding furigana in Google Docs. I wanted readings to appear automatically, work offline, and leave the original document unchanged. That grew into this extension: a little help while browsing, with extra room to read when you need it.
+
+## For developers
+
+<details>
+<summary><strong>Build and test</strong></summary>
 
 Run these commands from the repository root if you want to develop the extension:
 
@@ -140,7 +176,18 @@ npm test
 
 The test suite has **20 tests**, including automatic annotations, unchanged source/layout, a 100,000-node webpage, a 100-page Docs fixture, cancellation, IME handling, settings, corrections, and the reading panel. Browser integration tests use a temporary profile and localhost server. They default to Brave's standard macOS executable; set `CHROMIUM_PATH` to an extension-capable Chromium executable elsewhere. Chrome distributions that disable command-line extension loading cannot run these integration tests. Your normal browser profile and Google account are not used.
 
-Screenshots are preserved in [`docs/screenshots/`](docs/screenshots/). Regenerated browser captures are written to `test-results/` during tests.
+The README uses real-use screenshots supplied by the project owner. Earlier fixture captures are also preserved in [`docs/screenshots/`](docs/screenshots/). Regenerated browser captures are written to `test-results/` during tests.
+
+</details>
+
+<details>
+<summary><strong>Performance and architecture</strong></summary>
+
+Work is bounded to visible content. Processing pauses in background tabs, waits for scrolling/editing to settle, and cancels stale queued work. Docs measurements are cached within each scan; collision checks inspect nearby glyphs. Dictionary caches and analysis batches have fixed limits. The reading panel is capped at 16,000 characters / 2,000 runs and 500 reading candidates.
+
+See [technical notes](docs/technical-notes.md) for the architecture, exact budgets, and compatibility details.
+
+</details>
 
 ## License
 
