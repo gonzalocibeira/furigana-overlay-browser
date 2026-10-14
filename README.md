@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/icons/logo.svg" alt="Kō · 考 — think" width="88">
+  <img src="docs/hero-banner.png" alt="Kō — Japanese Reading Companion, showing furigana on Japanese Wikipedia and the Google Docs reading view against an ukiyo-e-inspired landscape" width="100%">
 </p>
 
 <h1 align="center">Kō — Japanese Reading Companion</h1>
