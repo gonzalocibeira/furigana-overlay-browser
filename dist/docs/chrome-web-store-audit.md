@@ -65,7 +65,7 @@ Do not certify that Kō handles no user data. Its purpose requires access to web
 
 ## Validation and submission checklist
 
-Completed for this build: typecheck passed; all 52 tests passed in Brave's Chromium engine using a disposable profile and localhost fixtures; `npm audit --omit=dev --json` reported zero known production dependency vulnerabilities. Every file in the store archive was byte-compared with the tested dist build; the root manifest and exclusions were verified. The ZIP is 15,529,867 bytes, SHA-256 `bb01e6749dbd7dd0439bf32eb6d4a2e031b8ca7159debb723e46504c8c38db74`. Browser tests initially required a sandbox escalation for browser launch and the local test server, then completed successfully. Live Google Docs and Chrome Web Store dashboard submission were not performed.
+Completed for this build: typecheck passed; all 52 tests passed in Brave's Chromium engine using a disposable profile and localhost fixtures; `npm audit --omit=dev --json` reported zero known production dependency vulnerabilities. Every file in the store archive was byte-compared with the tested dist build; the root manifest and exclusions were verified. The ZIP is 15,529,898 bytes, SHA-256 `ef833c4452dd824f4dbf635dfafadc99c6814c03093a977bb90b5d9ceab08e7a`. Browser tests initially required a sandbox escalation for browser launch and the local test server, then completed successfully. Live Google Docs and Chrome Web Store dashboard submission were not performed.
 
 - Run `npm run build`, `npm run typecheck`, and `npm test`. Security regression tests cover worker sender boundaries, bridge input/one-time initialization, and executable bundle string-compilation/loader checks. Browser integration tests also cover hostile remote HTML, lemma-only definition requests, offline corrections, cancellation, and Docs fixtures.
 - Run `npm run package:store` (requires the system `zip` command). Upload `ko-japanese-reading-companion-1.0.0-chrome-web-store.zip`. Rebuild and retest after any code or disclosure changes.
@@ -89,3 +89,7 @@ Added an About Kō options page with project summary, privacy policy (public and
 ## Ukiyo-e About page styling
 
 Added an original, local SVG landscape inspired by the README's indigo mountains, vermilion sun, flowering branches, and lake. The README banner itself is not used by the About page or included in the store ZIP. Retained paper textures, serif headings, vermilion seals, Japanese chapter numerals, and responsive panels. The logo and title share the same top edge, verified in-browser at 1280, 700, 390, and 320 px. Typecheck passed; no horizontal overflow; images loaded locally. Desktop/mobile previews were visually inspected. Rebuilt and byte-verified the store archive including the original artwork.
+
+## Popup scrolling fix
+
+Prevented body overflow from propagating to the document root. The popup body now scrolls within the smaller of 580 px and the available viewport height, so footer links and expanded controls remain reachable. The browser regression reproduced the old failure with wheel input, then passed after the fix at both 580 px and 400 px heights, including opening About Kō from the scrolled footer. Rebuilt and byte-verified the store ZIP; typecheck passed.
