@@ -1,6 +1,6 @@
 {
   "name": "ko-japanese-reading-companion",
-  "version": "0.5.0",
+  "version": "1.0.0",
   "description": "Kō — offline Japanese readings for webpages and Google Docs, with a reading panel and optional word definitions.",
   "scripts": {
     "build": "node scripts/build.mjs",

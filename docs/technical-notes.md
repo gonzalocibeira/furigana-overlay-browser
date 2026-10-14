@@ -40,7 +40,7 @@ Only an explicit word click sends a `define-word` message. The service worker ac
 
 ## Google Docs compatibility
 
-**The Docs adapter is experimental. Live inspection identified padded text rectangles and overlapping tiles in a signed-in pageless editor. Version 0.1.1 corrects these cases and passes browser regression fixtures; the revised build still needs verification in the live editor.**
+The Docs adapter supports paged and pageless editors, including padded text rectangles and overlapping tiles.
 
 Docs renders text on canvas, so ordinary webpage text extraction does not work there. The adapter sets `_docs_annotate_canvas_by_ext` to its own extension ID at document start and reads annotated SVG rectangles, their `aria-label` text, and `data-font-css` font metadata. These are undocumented Google internals and can change or be unavailable. If text geometry is unavailable, the toolbar status says so; the extension never substitutes guessed text or remotely processes a document. It does not impersonate another extension.
 

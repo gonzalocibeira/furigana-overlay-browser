@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Kō — Japanese Reading Companion",
   "short_name": "Kō",
-  "version": "0.5.0",
+  "version": "1.0.0",
   "description": "Automatic offline furigana overlays for webpages and Google Docs.",
   "permissions": [
     "storage",

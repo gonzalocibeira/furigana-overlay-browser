@@ -5,7 +5,7 @@
 <h1 align="center">Kō — Japanese Reading Companion</h1>
 <p align="center"><strong>Japanese reading companion.</strong></p>
 <p align="center">Automatic Japanese readings for webpages and Google Docs.<br>Furigana runs on your device. Optional word definitions use Wiktionary online.</p>
-<p align="center">Version <strong>0.5.0</strong> · 14 October 2026</p>
+<p align="center">Version <strong>1.0.0</strong> · 14 October 2026</p>
 <p align="center">
   <a href="#install-in-chrome">Install in Chrome</a> ·
   <a href="#see-it-in-action">See it in action</a> ·
@@ -25,15 +25,11 @@
 
 ## Release notes
 
-### Current working build
+### 1.0.0 · 14 October 2026
 
 - **Kō — Japanese Reading Companion.** The new name and vermilion 考 seal share the same identity. The interface uses warm paper, ink, indigo, and vermilion inspired by ukiyo-e prints.
-
 - **Brutalist interface.** Square controls, bold headings, ink borders, and an ukiyo-e-inspired palette across the popup, reading panel, definitions, and corrections.
 - **Per-tab 考 icon.** See whether readings are active, paused, or unavailable without opening the menu. Hover over the icon for details.
-
-### 0.5.0 · 14 October 2026
-
 - **Reading view on webpages and Google Docs.** Enable the panel per website. It follows visible text after scrolling settles, including wrapped webpage paragraphs and kana-only words.
 - **Choose your reading size and panel width.** Select 16–32 px text in the popup, or drag the panel’s left edge to resize. Text size, spacing, and width are remembered across sites.
 - **Correct readings where you read.** Open a word’s detail card, choose **Correct reading**, and save its preferred pronunciation—even when online definitions fail. Restore the automatic reading from the same form.
@@ -47,10 +43,10 @@ Read the [full release notes](docs/release-notes.md) for details and update inst
 
 The ready-to-load **Kō — Japanese Reading Companion** extension is included in [`dist/`](). It is distributed through GitHub, not the Chrome Web Store.
 
-1. **Download [this repository](https://github.com/gonzalocibeira/ko-japanese-reading-companion).** Click **Code → Download ZIP** at the top of the GitHub page. For a private repository, sign in with an account that has access.
+1. **Download the [1.0.0 extension ZIP](https://github.com/gonzalocibeira/ko-japanese-reading-companion/releases/download/v1.0.0/ko-japanese-reading-companion-1.0.0.zip).** It contains the ready-to-load `dist` folder. You can also download the full source from [the repository](https://github.com/gonzalocibeira/ko-japanese-reading-companion) using **Code → Download ZIP**.
 2. **Extract and keep the folder.** Put it somewhere permanent, such as `Documents/Ko`.
 3. **Open Chrome's extensions page.** Enter `chrome://extensions` in the address bar and turn on **Developer mode**.
-4. **Load the extension.** Click **Load unpacked** and select the **extension folder** inside the extracted repository. It contains `manifest.json`.
+4. **Load the extension.** Click **Load unpacked** and select the **extension folder** inside the extracted folder. It contains `manifest.json`.
 5. **Reload your tabs and read.** Furigana starts automatically. The first page may take a moment while the bundled reading dictionary loads.
 
 **Tip:** Pin **Kō — Japanese Reading Companion** from Chrome's puzzle-piece **Extensions** menu. Look for the warm-paper **考** (think) on a vermilion seal.
@@ -59,9 +55,7 @@ The ready-to-load **Kō — Japanese Reading Companion** extension is included i
 <summary><strong>Which folder should I select?</strong></summary>
 
 ```text
-ko-japanese-reading-companion-<branch>/
-├── README.md
-├── src/
+ko-japanese-reading-companion-1.0.0/
 └── dist/                  ← Select this folder in “Load unpacked”
     ├── manifest.json
     ├── content.js
@@ -78,11 +72,9 @@ See [Chrome's official instructions for loading unpacked extensions](https://dev
 
 ## See it in action
 
-### New interface and toolbar status
+### Interface and toolbar status
 
 The popup and reading panel use square controls, ink borders, warm paper surfaces, indigo, and vermilion accents. All reading settings, corrections, and backups remain available in the expandable sections.
-
-![The redesigned brutalist extension popup with indigo active status and square controls](docs/screenshots/popup.png)
 
 | Toolbar icon | Meaning |
 | --- | --- |
@@ -91,10 +83,6 @@ The popup and reading panel use square controls, ink borders, warm paper surface
 | **Outlined 考 with a slash** | The page is unavailable, processing failed, or the tab needs a reload. Hover over the icon for the reason. |
 
 Scrolling, typing, and background-tab suspension do not change an otherwise active icon. Click any icon state to open the menu.
-
-![The redesigned reading panel beside a Google Docs browser fixture](docs/screenshots/docs-reading-view.png)
-
-These new screenshots use browser fixtures. The live captures below show the earlier interface and are retained to illustrate real webpage and Google Docs use.
 
 ### On the web
 
@@ -131,7 +119,7 @@ Definitions come from the English and Japanese editions of Wiktionary and requir
 
 You can also focus a word with Tab and open it with Enter or Space. Press Escape or the definition card's **×** button to dismiss it and return to reading.
 
-These screenshots show real use on Japanese Wikipedia and in Google Docs. **Google Docs support is experimental**; compatibility can vary as Google's editor changes. The reading panel is text-only: tables and formatting may be simplified, and images are omitted.
+These screenshots show Kō 1.0 in use on Japanese Wikipedia and in Google Docs. The reading panel is text-only: tables and formatting may be simplified, and images are omitted.
 
 ## Make it yours
 
@@ -187,7 +175,7 @@ Original text nodes, editor values, and document formatting remain unchanged. Ov
 | Some words have no readings | The dictionary may not know the word, or there may be insufficient space. Add a local correction, reduce the reading size, or try the reading view. |
 | A name is read incorrectly | Add its preferred reading under **Local reading corrections**. |
 | Google Docs text is unavailable | Reload the document. If the status persists, that editor version may not expose compatible text geometry. |
-| No readings in a PDF, image, browser settings page, or another canvas app | These surfaces are unsupported. Google Docs has a dedicated experimental adapter. |
+| No readings in a PDF, image, browser settings page, or another canvas app | These surfaces are unsupported. Google Docs has a dedicated text adapter. |
 | Cannot find **Load unpacked** | Enable Developer mode. If the control is unavailable, check whether your browser is managed. |
 
 Webpage text inside editable controls or existing ruby is skipped. Vertical writing, rotated text, and closed shadow roots are unsupported. Overlay readings skip words fragmented across lines; the reading panel can reflow wrapped webpage text. The panel reads the top-level page, without combining embedded-frame text. Very dense or complex viewports can exceed discovery limits.
@@ -238,7 +226,7 @@ npm test
 
 The test suite has **42 tests**, including automatic annotations, unchanged source/layout, a 100,000-node webpage, a 100-page Docs fixture, cancellation, IME handling, settings, corrections, vocabulary/name disambiguation, the reading panel, debounced refreshes, bilingual word definitions, toolbar state and lifecycle, and expanded popup forms. Browser integration tests use a temporary profile and localhost server. They default to Brave's standard macOS executable; set `CHROMIUM_PATH` to an extension-capable Chromium executable elsewhere. Chrome distributions that disable command-line extension loading cannot run these integration tests. Your normal browser profile and Google account are not used.
 
-The README uses real-use screenshots supplied by the project owner. Earlier fixture captures are also preserved in [`docs/screenshots/`](docs/screenshots/). Regenerated browser captures are written to `test-results/` during tests.
+The README uses real-use screenshots supplied by the project owner. The four current screenshots cover webpage overlays, Google Docs overlays, the reading panel, and bilingual word definitions. Earlier fixture captures remain in [`docs/screenshots/`](docs/screenshots/). Regenerated browser captures are written to `test-results/` during tests.
 
 </details>
 

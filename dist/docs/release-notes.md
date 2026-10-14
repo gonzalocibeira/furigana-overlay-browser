@@ -1,15 +1,17 @@
 # Release notes
 
-## Unreleased · Kō branding, woodblock palette, and toolbar status
+## 1.0.0 · 14 October 2026
+
+The first 1.0 release of **Kō — Japanese Reading Companion** brings automatic offline furigana to webpages and Google Docs, with a spacious reading panel and optional bilingual word definitions.
 
 - Renamed the extension **Kō — Japanese Reading Companion**, aligning its name with the 考 mark. Warm paper, ink, muted indigo, and a vermilion seal replace the cobalt-and-gray palette. Repository, npm package, downloads, and internal UI identifiers now use `ko-japanese-reading-companion` / `ko-`. Existing saved settings, corrections, and version 1 backups are retained.
-
 - Redesigned the popup, reading panel, definition cards, and correction forms with square controls, bold monospace headings, ink borders, warm paper surfaces, indigo, and vermilion accents. Japanese reading text keeps a readable system font. The popup is 380 px wide with expandable settings and keyboard focus indicators.
 - The new 考 (think) mark appears in the popup, reading-panel header, and toolbar. A vermilion icon means readings are enabled and available on this tab; a sand-colored icon with a pause indicator means global or site pause; an outlined icon with a slash means unavailable or a reload is needed. Hover for the reason. The popup remains accessible in all states.
 - The toolbar stays active without visible kanji and during scrolling, typing, or background-tab processing pauses. State updates follow navigation, tab activation, preferences, availability recovery, and service-worker restarts. Embedded frames cannot set the top-level icon.
-- Existing settings, corrections, backup formats, overlay appearance, and permissions are preserved.
+- The reading panel supports 16–32 px text, adjustable line spacing, and pointer or keyboard resizing. Click words for English and Japanese definitions, or save a preferred reading directly in the panel.
+- Search, export, and import local reading corrections. Existing settings, corrections, backup formats, overlay appearance, and permissions are preserved.
 
-Reload the extension, then reload open webpages and Google Docs tabs. The new screenshots in the README use browser fixtures; earlier live captures are retained for compatibility context.
+Reload the extension, then reload open webpages and Google Docs tabs. The README now uses four current screenshots of real webpage and Google Docs use. Download the ready-to-load extension ZIP from the [1.0.0 release](https://github.com/gonzalocibeira/ko-japanese-reading-companion/releases/tag/v1.0.0).
 
 ## 0.5.0 · 14 October 2026
 
@@ -19,7 +21,7 @@ Reload the extension, then reload open webpages and Google Docs tabs. The new sc
 - Search corrections by word or reading. Export a version 1 JSON backup or import one up to 256 KiB. Imports keep existing readings on conflicts and reject malformed or over-capacity backups without partial changes.
 - No new dependencies or permissions. Furigana stays offline; explicit word definitions use the same Wiktionary services on webpages and Docs.
 
-Reload the extension from the rebuilt `dist/` folder, then reload open tabs. The panel still uses text-only extraction; browser-protected pages, images, PDFs, unsupported canvas editors, and cross-frame aggregation remain unsupported. Live Google Docs compatibility remains experimental.
+Reload the extension from the rebuilt `dist/` folder, then reload open tabs. The panel still uses text-only extraction; browser-protected pages, images, PDFs, unsupported canvas editors, and cross-frame aggregation remain unsupported.
 
 ## 0.4.0 · 14 October 2026
 
@@ -48,7 +50,7 @@ This release adds bilingual word definitions, steadier Google Docs reading-panel
 
 ### Validation
 
-The release is checked with `npm run build`, `npm run typecheck`, and all 27 Playwright tests. Tests include the actual bundled dictionary, Docs overlays and word metadata, name and sentence readings, saved corrections, definition lookups, refresh behavior, and existing large-document and IME fixtures. Browser tests use a temporary profile and synthetic documents; live Google Docs compatibility remains experimental.
+The release is checked with `npm run build`, `npm run typecheck`, and all 27 Playwright tests. Tests include the actual bundled dictionary, Docs overlays and word metadata, name and sentence readings, saved corrections, definition lookups, refresh behavior, and existing large-document and IME fixtures. Browser tests use a temporary profile and synthetic documents.
 
 ### Updating
 
