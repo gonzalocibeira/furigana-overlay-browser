@@ -129,10 +129,12 @@
     gap(text.length);
     return out;
   }
+  var correctionBackupLimit;
   var init_preferences = __esm({
     "src/preferences.ts"() {
       "use strict";
       init_shared();
+      correctionBackupLimit = 256 * 1024;
     }
   });
 

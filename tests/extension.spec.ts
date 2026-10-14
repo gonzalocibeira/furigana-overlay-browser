@@ -31,7 +31,16 @@ async function annotations(page:Page) {
     return result.result.value as {text:string;top:number;left:number;fontSize:number;color:string}[];
   } finally {await session.detach();}
 }
-async function settings(values:Record<string,unknown>) {const worker=context.serviceWorkers()[0];await worker.evaluate(values=>chrome.storage.local.set(values),values);}
+async function settings(values:Record<string,unknown>) {
+  const worker=context.serviceWorkers()[0];
+  await worker.evaluate(async values=>{
+    if(values.docsReadingView) {
+      const view=values.docsReadingView as {enabled:boolean;spacing:number};
+      values.readingView={sites:{'docs.google.com':view.enabled},spacing:view.spacing,fontSize:20,width:420};
+    }
+    await chrome.storage.local.set(values);
+  },values);
+}
 test('vocabulary noun readings reach Docs overlays and word metadata without changing names or saved corrections',async()=>{
   await settings({docsReadingView:{enabled:false,spacing:2.8},readingOverrides:{}});
   const page=await context.newPage();
@@ -167,7 +176,7 @@ test('popup shows page status, persists switches, and loads packaged branding',a
   await page.bringToFront();
   await popup.goto(`chrome-extension://${extension}/popup.html`);
   await expect(popup.locator('#site')).toHaveText('127.0.0.1');
-  await expect(popup.locator('#docs-reading-panel')).toBeHidden();
+  await expect(popup.locator('#view-reading-panel')).toBeVisible();
   await expect(popup.locator('#status-card')).toHaveAttribute('data-state','active');
   expect(await popup.locator('header img').evaluate((img:HTMLImageElement)=>img.complete&&img.naturalWidth>0)).toBe(true);
   await popup.locator('body').screenshot({path:test.info().outputPath('popup.png'),caret:'initial'});
@@ -273,8 +282,8 @@ test('optional Docs reading view spaces ruby, follows active page and edits, pre
   expect(await readerEval(page,readerSnapshot)).toBeNull();
   const before=await page.locator('.kix-appview-editor').evaluate(el=>({html:el.innerHTML,rect:el.getBoundingClientRect().toJSON()}));
   const popup=await context.newPage();await page.bringToFront();await popup.goto(`chrome-extension://${extension}/popup.html`);
-  await expect(popup.locator('#docs-reading-panel')).toBeVisible();
-  await popup.locator('#docs-reading-panel summary').click();
+  await expect(popup.locator('#view-reading-panel')).toBeVisible();
+  await popup.locator('#view-reading-panel summary').click();
   await popup.getByRole('switch',{name:/Extra-space reading view/}).check();
   await popup.getByLabel('Line spacing',{exact:true}).selectOption('3.4');
   await expect.poll(async()=> (await readerEval(page,readerSnapshot))?.readings).toContain('にほんご');
@@ -283,7 +292,7 @@ test('optional Docs reading view spaces ruby, follows active page and edits, pre
   expect((await readerEval(page,readerSnapshot)).lines).toContain('日本語を勉強する。');
   expect(await annotations(page)).toHaveLength(0);
   expect(await page.locator('.kix-appview-editor').evaluate(el=>({html:el.innerHTML,rect:el.getBoundingClientRect().toJSON()}))).toEqual(before);
-  await page.screenshot({path:test.info().outputPath('docs-reading-view.png'),caret:'initial'});
+  await page.screenshot({path:test.info().outputPath('view-reading-view.png'),caret:'initial'});
   await readerEval(page,`function(){this.querySelector('.content').scrollTop=100;return true}`);
   await page.waitForTimeout(300);
   expect((await readerEval(page,readerSnapshot)).scrollTop).toBeGreaterThan(0);
@@ -301,8 +310,8 @@ test('optional Docs reading view spaces ruby, follows active page and edits, pre
   await expect(page.locator('fob-reading-view')).toHaveCount(0);
   await expect.poll(async()=> (await annotations(page)).map(a=>a.text)).toContain('としょかん');
   await popup.close();const reopened=await context.newPage();await page.bringToFront();await reopened.goto(`chrome-extension://${extension}/popup.html`);
-  await expect(reopened.locator('#docs-reading-enabled')).not.toBeChecked();await expect(reopened.locator('#docs-reading-spacing')).toHaveValue('3.4');
-  await reopened.locator('#docs-reading-panel summary').click();await reopened.getByRole('switch',{name:/Extra-space reading view/}).check();
+  await expect(reopened.locator('#view-reading-enabled')).not.toBeChecked();await expect(reopened.locator('#view-reading-spacing')).toHaveValue('3.4');
+  await reopened.locator('#view-reading-panel summary').click();await reopened.getByRole('switch',{name:/Extra-space reading view/}).check();
   await expect.poll(async()=> (await readerEval(page,readerSnapshot))?.readings).toContain('としょかん');
   await settings({enabled:false});await expect(page.locator('fob-reading-view')).toHaveCount(0);
   await settings({enabled:true,excluded:['docs.google.com']});await expect(page.locator('fob-reading-view')).toHaveCount(0);
@@ -443,4 +452,137 @@ test('Docs panel debounces edits and preserves text, scroll, focus, and definiti
     await context.unroute('https://*.wiktionary.org/w/api.php*');
     await settings({enabled:true,docsReadingView:{enabled:false,spacing:2.8}});await page.close();
   }
+});
+
+const webPanelSettings={sites:{'127.0.0.1':true},spacing:2.8,fontSize:20,width:420};
+
+test('web reading panel handles wrapped inline text, kana, viewport changes and its own occlusion',async()=>{
+  await settings({enabled:true,excluded:[],readingOverrides:{},readingView:webPanelSettings,siteAppearance:{}});
+  const page=await context.newPage();
+  await page.route(`${base}/reader-web`,route=>route.fulfill({contentType:'text/html',body:`<!doctype html><meta charset="utf-8"><style>body{margin:30px;font:24px/2.5 system-ui}.wrapped{width:240px}.covered{position:absolute;right:40px;top:100px}footer{position:absolute;top:1800px}</style><p id="inline" class="wrapped">日<span>本</span>語を勉強する。図書館で本を読む。</p><p>ありがとう。</p><p class="covered">東京大学。</p><textarea>編集しない</textarea><p hidden>隠された文章</p><footer>京都大学。</footer>`}));
+  await page.goto(`${base}/reader-web`);
+  const original=await page.locator('body').innerHTML();
+  await expect.poll(async()=> (await readerEval(page,readerSnapshot))?.lines,{timeout:30000}).toContain('日本語を勉強する。図書館で本を読む。');
+  const snapshot=await readerEval(page,readerSnapshot);
+  expect(snapshot.lines).toContain('ありがとう。');expect(snapshot.lines).toContain('東京大学。');
+  expect(snapshot.lines.join('')).not.toMatch(/京都大学|編集しない|隠された|Reading view/);
+  expect(snapshot.readings).toContain('にほんご');expect((await annotations(page))).toHaveLength(0);
+  expect(await readerEval(page,`function(){return !!this.querySelector('[data-surface="ありがとう"]')}`)).toBe(true);
+  await page.waitForTimeout(700);
+  expect((await readerEval(page,readerSnapshot)).lines).toEqual(snapshot.lines);
+  expect(await page.locator('body').innerHTML()).toBe(original);
+  await page.screenshot({path:test.info().outputPath('web-reading-panel.png')});
+  await page.locator('#inline').evaluate(el=>el.textContent='学校で学ぶ。');
+  await expect.poll(async()=> (await readerEval(page,readerSnapshot))?.lines).toContain('学校で学ぶ。');
+  await page.evaluate(()=>scrollTo(0,1600));
+  await expect.poll(async()=> (await readerEval(page,readerSnapshot))?.lines).toContain('京都大学。');
+  expect((await readerEval(page,readerSnapshot)).lines).not.toContain('学校で学ぶ。');
+  await page.evaluate(()=>document.body.replaceChildren());
+  await expect.poll(()=>readerEval(page,`function(){return this.querySelector('.empty')?.textContent}`)).toContain('No readable text');
+  await page.close();await settings({readingView:{...webPanelSettings,sites:{}}});
+});
+
+test('web panel definitions and offline corrections update effective readings and support restoration',async()=>{
+  const requested:string[]=[];
+  await context.route('https://*.wiktionary.org/w/api.php*',route=>{requested.push(route.request().url());return route.abort();});
+  await settings({enabled:true,excluded:[],readingOverrides:{},readingView:webPanelSettings});
+  const page=await context.newPage();await page.goto(base);
+  const before=await page.locator('body').innerHTML();
+  await expect.poll(async()=> (await readerEval(page,readerSnapshot))?.readings,{timeout:30000}).toContain('にほんご');
+  const open=`function(){this.querySelector('[data-surface="日本語"]').click();Array.from(this.querySelectorAll('.definition button')).find(b=>b.textContent==='Correct reading').click();return Array.from(this.querySelectorAll('.correction-form input'),i=>i.value)}`;
+  expect(await readerEval(page,open)).toEqual(['日本語','にほんご']);
+  await expect.poll(()=>requested.length).toBe(2);
+  await readerEval(page,`function(){const inputs=this.querySelectorAll('.correction-form input');inputs[1].value='abc';this.querySelector('.correction-form').requestSubmit();}`);
+  await expect.poll(()=>readerEval(page,`function(){return this.querySelector('.correction-form .feedback').textContent}`)).toContain('hiragana or katakana');
+  await readerEval(page,`function(){const inputs=this.querySelectorAll('.correction-form input');inputs[1].value='ニッポンゴ';inputs[1].dispatchEvent(new Event('input',{bubbles:true,composed:true}));this.querySelector('.correction-form').requestSubmit();}`);
+  await expect.poll(async()=> (await readerEval(page,readerSnapshot))?.readings).toContain('にっぽんご');
+  expect(await readerEval(page,open)).toEqual(['日本語','にっぽんご']);
+  expect(await readerEval(page,`function(){return this.querySelector('.pronunciation').textContent}`)).toContain('にっぽんご');
+  await readerEval(page,`function(){Array.from(this.querySelectorAll('.correction-actions button')).find(b=>b.textContent==='Restore automatic reading').click()}`);
+  await expect.poll(async()=> (await readerEval(page,readerSnapshot))?.readings).toContain('にほんご');
+  await settings({readingOverrides:{'日本語を勉強':'にっぽんごをべんきょう'}});
+  await expect.poll(()=>readerEval(page,`function(){return this.querySelector('[data-surface="日本語を勉強"]')?.dataset.reading}`)).toBe('にっぽんごをべんきょう');
+  expect(await page.locator('body').innerHTML()).toBe(before);
+  await page.close();await context.unroute('https://*.wiktionary.org/w/api.php*');await settings({readingOverrides:{},readingView:{...webPanelSettings,sites:{}}});
+});
+
+test('panel appearance and resizing preserve content, selection and definition; sites stay independent',async()=>{
+  await context.route('https://*.wiktionary.org/w/api.php*',route=>route.fulfill({json:{parse:{title:'日本語',text:'<h2>Japanese</h2><h3>Noun</h3><ol><li>The Japanese language.</li></ol>'}}}));
+  await settings({enabled:true,excluded:[],readingOverrides:{},readingView:webPanelSettings});
+  const page=await context.newPage();await page.goto(base);
+  await expect.poll(async()=> (await readerEval(page,readerSnapshot))?.readings,{timeout:30000}).toContain('にほんご');
+  await readerEval(page,`function(){const word=this.querySelector('[data-surface="日本語"]');word.click();word.focus();const range=document.createRange();range.selectNodeContents(word);this.getSelection().removeAllRanges();this.getSelection().addRange(range);this.testWord=word;this.changes=0;this.testObserver=new MutationObserver(()=>this.changes++);this.testObserver.observe(this.querySelector('.content'),{childList:true});}`);
+  await settings({readingView:{...webPanelSettings,fontSize:28,width:500,spacing:3.4}});
+  const metrics=`function(){return {font:getComputedStyle(this.querySelector('.content')).fontSize,width:this.host.getBoundingClientRect().width,same:this.testWord===this.querySelector('[data-surface="日本語"]'),changes:this.changes,definition:this.querySelector('.definition').hidden,selection:this.getSelection().toString()}}`;
+  await expect.poll(()=>readerEval(page,metrics)).toMatchObject({font:'28px',width:500,same:true,changes:0,definition:false});
+  expect((await readerEval(page,metrics)).selection).toContain('日本語');
+  await readerEval(page,`function(){this.querySelector('.resize').focus()}`);await page.keyboard.press('ArrowLeft');
+  await expect.poll(()=>context.serviceWorkers()[0].evaluate(async()=> (await chrome.storage.local.get('readingView')).readingView.width)).toBe(510);
+  const box=await page.locator('fob-reading-view').boundingBox();
+  await page.mouse.move(box!.x,box!.y+30);await page.mouse.down();await page.mouse.move(box!.x-70,box!.y+30);
+  expect(await context.serviceWorkers()[0].evaluate(async()=> (await chrome.storage.local.get('readingView')).readingView.width)).toBe(510);
+  await page.mouse.up();
+  await expect.poll(()=>context.serviceWorkers()[0].evaluate(async()=> (await chrome.storage.local.get('readingView')).readingView.width)).toBe(580);
+  await page.reload();await expect.poll(()=>readerEval(page,`function(){return this.host.getBoundingClientRect().width}`)).toBe(580);
+  await page.setViewportSize({width:300,height:650});
+  await expect.poll(()=>readerEval(page,`function(){return this.host.getBoundingClientRect().width}`)).toBe(276);
+  await page.setViewportSize({width:1000,height:800});
+  const other=await context.newPage();await other.goto(base.replace('127.0.0.1','localhost'));
+  await expect.poll(async()=> (await annotations(other)).length,{timeout:30000}).toBeGreaterThan(0);await expect(other.locator('fob-reading-view')).toHaveCount(0);
+  await page.bringToFront();await readerEval(page,`function(){this.querySelector('.header button').click()}`);await expect(page.locator('fob-reading-view')).toHaveCount(0);
+  await page.reload();await expect.poll(async()=> (await annotations(page)).length).toBeGreaterThan(0);await expect(page.locator('fob-reading-view')).toHaveCount(0);
+  await other.close();await page.close();await context.unroute('https://*.wiktionary.org/w/api.php*');
+});
+
+test('popup searches, exports and imports correction backups without losing existing readings',async()=>{
+  await settings({readingView:{...webPanelSettings,sites:{}},readingOverrides:{'日本語':'にっぽんご','東京':'とうきょう'}});
+  const page=await context.newPage();await page.goto(base);
+  const popup=await context.newPage();await page.bringToFront();await popup.goto(`chrome-extension://${extension}/popup.html`);
+  await popup.locator('#correction-panel summary').click();
+  await popup.locator('#correction-search').fill('トウキョウ');await expect(popup.locator('#corrections li')).toHaveCount(1);
+  await popup.getByRole('button',{name:'Edit 東京',exact:true}).click();await popup.locator('#correction-reading').fill('とうきょ');await popup.getByRole('button',{name:'Save correction',exact:true}).click();
+  await expect(popup.locator('#correction-search')).toHaveValue('トウキョウ');await expect(popup.locator('#correction-empty')).toBeVisible();
+  await popup.locator('#correction-search').fill('日本');await expect(popup.locator('#corrections li')).toHaveCount(1);
+  const downloadEvent=popup.waitForEvent('download');await popup.getByRole('button',{name:'Export backup'}).click();const download=await downloadEvent;
+  const {readFile}=await import('node:fs/promises');const exported=JSON.parse(await readFile((await download.path())!,'utf8'));
+  expect(exported).toEqual({version:1,corrections:{'日本語':'にっぽんご','東京':'とうきょ'}});
+  const upload=async(data:unknown)=>popup.locator('#correction-file').setInputFiles({name:'backup.json',mimeType:'application/json',buffer:Buffer.from(typeof data==='string'?data:JSON.stringify(data))});
+  await upload({version:1,corrections:{'日本語':'にほんご','学校':'ガッコウ'}});
+  await expect(popup.locator('#correction-feedback')).toHaveText('Imported 1 corrections; skipped 1 existing words.');
+  await expect(popup.locator('#correction-search')).toHaveValue('日本');await expect(popup.locator('#corrections')).toContainText('にっぽんご');
+  const snapshot=await context.serviceWorkers()[0].evaluate(()=>chrome.storage.local.get('readingOverrides'));
+  await upload({version:1,corrections:{'京都':'きょうと','学校':17}});await expect(popup.locator('#correction-feedback')).toContainText('invalid');
+  expect(await context.serviceWorkers()[0].evaluate(()=>chrome.storage.local.get('readingOverrides'))).toEqual(snapshot);
+  await upload('{');await expect(popup.locator('#correction-feedback')).toContainText('JSON');
+  await upload(' '.repeat(256*1024+1));await expect(popup.locator('#correction-feedback')).toContainText('256 KiB');
+  await popup.screenshot({path:test.info().outputPath('popup-correction-backups.png')});
+  await popup.close();await page.close();await settings({readingOverrides:{}});
+});
+
+test('legacy Docs preferences migrate through popup without enabling other websites',async()=>{
+  const worker=context.serviceWorkers()[0];await worker.evaluate(async()=>{await chrome.storage.local.remove('readingView');await chrome.storage.local.set({docsReadingView:{enabled:true,spacing:3.4}});});
+  const page=await context.newPage();await page.route('https://docs.google.com/document/d/migrate/edit',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><meta charset="utf-8"><style>.kix-appview-editor{position:absolute;top:100px;width:900px;height:600px}</style><div class="kix-appview-editor"><svg width="900" height="600"><rect x="40" y="60" width="150" height="28" data-font-css="24px system-ui" aria-label="日本語"/></svg></div>'}));await page.goto('https://docs.google.com/document/d/migrate/edit');
+  await expect.poll(async()=> (await readerEval(page,readerSnapshot))?.readings,{timeout:30000}).toContain('にほんご');
+  const popup=await context.newPage();await page.bringToFront();await popup.goto(`chrome-extension://${extension}/popup.html`);await popup.locator('#view-reading-panel summary').click();
+  await expect(popup.locator('#view-reading-enabled')).toBeChecked();await expect(popup.locator('#view-reading-spacing')).toHaveValue('3.4');
+  await popup.locator('#panel-font-size').selectOption('24');
+  await expect.poll(()=>worker.evaluate(async()=> (await chrome.storage.local.get('readingView')).readingView)).toEqual({sites:{'docs.google.com':true},spacing:3.4,fontSize:24,width:420});
+  await page.screenshot({path:test.info().outputPath('docs-custom-reading-panel.png')});
+  await popup.close();await page.close();await settings({docsReadingView:{enabled:false,spacing:2.8}});
+});
+
+test('web panel clips offscreen wrapped text, preserves hard breaks and shadow order, and stays out of frames',async()=>{
+  await settings({enabled:true,excluded:[],readingOverrides:{},readingView:webPanelSettings});
+  const page=await context.newPage();
+  await page.route(`${base}/reader-boundaries`,route=>route.fulfill({contentType:'text/html',body:`<!doctype html><meta charset="utf-8"><style>body{margin:0;font:24px/2 system-ui}.clipped{position:absolute;top:-500px;left:20px;width:240px}</style><p class="clipped">最初の印。${'学校で日本語を勉強する。'.repeat(50)}最後の印。</p><p style="position:absolute;left:700px;top:20px">こんにちは。<br>ありがとう。</p><div id="shadow" style="position:absolute;left:350px;top:300px"></div><iframe style="position:absolute;top:650px" srcdoc="<p>埋め込みの文章。</p>"></iframe>`}));
+  await page.goto(`${base}/reader-boundaries`);
+  await page.locator('#shadow').evaluate(el=>{el.attachShadow({mode:'open'}).innerHTML='<p>順序一。</p><p>順序二。</p>';document.dispatchEvent(new Event('scroll'));});
+  await expect.poll(async()=> (await readerEval(page,readerSnapshot))?.lines,{timeout:30000}).toContain('こんにちは。\nありがとう。');
+  await expect.poll(async()=> (await readerEval(page,readerSnapshot))?.lines).toContain('順序一。');
+  const snapshot=await readerEval(page,readerSnapshot);
+  expect(snapshot.lines.join('')).not.toMatch(/最初の印|最後の印|埋め込みの文章/);
+  expect(snapshot.lines.indexOf('順序一。')).toBeGreaterThan(-1);
+  expect(snapshot.lines.indexOf('順序二。')).toBeGreaterThan(snapshot.lines.indexOf('順序一。'));
+  for(const frame of page.frames())if(frame!==page.mainFrame())await expect(frame.locator('fob-reading-view')).toHaveCount(0);
+  await page.close();await settings({readingView:{...webPanelSettings,sites:{}}});
 });

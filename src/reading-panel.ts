@@ -1,5 +1,5 @@
 import type {Reading,Word} from './shared';
-import type {Appearance,DocsReadingView} from './preferences';
+import {saveCorrection,removeCorrection,type Appearance,type ReadingViewPreferences} from './preferences';
 import {definitionText,dictionaryURL,type DictionaryReply,type DictionaryPage,type DefinitionLanguage} from './definitions';
 export interface ReadingRun {text:string;top:number;left:number;right:number;readings:Reading[];words?:Word[]}
 export function readingLines(runs:ReadingRun[]) {
@@ -34,11 +34,36 @@ export class ReadingPanel {
   private lookupVersion=0;
   private selected?:HTMLButtonElement;
   private definitions=new Map<string,DefinitionResult>();
-  constructor(close:()=>void) {
+  private overrides:Record<string,string>={};
+  private resizeHandle:HTMLElement;
+  private resizeStart?:{x:number;width:number};
+  private width=420;
+  private saveWidth:(width:number)=>Promise<unknown>;
+  setOverrides(values:Record<string,string>) {this.overrides=values;}
+
+  constructor(close:()=>void,saveWidth:(width:number)=>Promise<unknown>) {
+    this.saveWidth=saveWidth;
     this.root.innerHTML=`<style>
-:host{all:initial!important;position:fixed!important;right:12px!important;top:var(--reader-top,100px)!important;bottom:12px!important;width:min(420px,calc(100vw - 24px))!important;z-index:2147483647!important;display:block!important;contain:layout style!important;color-scheme:light!important}*{box-sizing:border-box}.reader{height:100%;display:flex;flex-direction:column;background:#fffdf7;color:#193f3c;border:1px solid #cbd8ce;border-radius:16px;box-shadow:0 8px 36px #193f3c26;overflow:hidden;font:13px/1.5 system-ui,sans-serif}.reader.high{color:#101010;background:#fff}.header{display:flex;align-items:center;gap:12px;padding:16px 18px;border-bottom:1px solid #dfe7e0}h2{font:700 16px/1.3 system-ui;margin:0}small{display:block;color:#647572;font-size:11px;margin-top:3px}button{margin-left:auto;flex:none;background:transparent;border:1px solid #cbd8ce;border-radius:8px;color:inherit;cursor:pointer;padding:6px 9px;font:600 12px system-ui}button:focus-visible,.content:focus-visible{outline:2px solid #c28637;outline-offset:-3px}.content{padding:18px 22px 28px;overflow:auto;overscroll-behavior:contain;flex:1;min-height:0;font:20px system-ui,sans-serif;user-select:text}.line{margin:0;line-height:var(--reader-spacing,2.8);white-space:pre-wrap;overflow-wrap:anywhere}ruby{ruby-position:over;ruby-align:center}rt{font:var(--reader-ruby,.5em)/1 system-ui,sans-serif}.empty{font:13px/1.6 system-ui;color:#647572}.status{margin:0;padding:10px 18px;border-top:1px solid #dfe7e0;color:#647572;font-size:11px}@media print{:host{display:none!important}}
+:host{all:initial!important;position:fixed!important;right:12px!important;top:var(--reader-top,100px)!important;bottom:12px!important;width:min(var(--reader-width,420px),calc(100vw - 24px))!important;z-index:2147483647!important;display:block!important;contain:layout style!important;color-scheme:light!important}*{box-sizing:border-box}.reader{height:100%;display:flex;flex-direction:column;background:#fffdf7;color:#193f3c;border:1px solid #cbd8ce;border-radius:16px;box-shadow:0 8px 36px #193f3c26;overflow:hidden;font:13px/1.5 system-ui,sans-serif}.reader.high{color:#101010;background:#fff}.header{display:flex;align-items:center;gap:12px;padding:16px 18px;border-bottom:1px solid #dfe7e0}h2{font:700 16px/1.3 system-ui;margin:0}small{display:block;color:#647572;font-size:11px;margin-top:3px}button{margin-left:auto;flex:none;background:transparent;border:1px solid #cbd8ce;border-radius:8px;color:inherit;cursor:pointer;padding:6px 9px;font:600 12px system-ui}button:focus-visible,.content:focus-visible{outline:2px solid #c28637;outline-offset:-3px}.content{padding:18px 22px 28px;overflow:auto;overscroll-behavior:contain;flex:1;min-height:0;font:var(--reader-font,20px) system-ui,sans-serif;user-select:text}.line{margin:0;line-height:var(--reader-spacing,2.8);white-space:pre-wrap;overflow-wrap:anywhere}ruby{ruby-position:over;ruby-align:center}rt{font:var(--reader-ruby,.5em)/1 system-ui,sans-serif}.empty{font:13px/1.6 system-ui;color:#647572}.status{margin:0;padding:10px 18px;border-top:1px solid #dfe7e0;color:#647572;font-size:11px}@media print{:host{display:none!important}}
 .word{display:inline;margin:0;padding:0;border:0;border-radius:3px;font:inherit;line-height:inherit;color:inherit;white-space:inherit;user-select:text}.word:hover,.word[aria-pressed=true]{background:#e4ebde;text-decoration:underline;text-decoration-color:#b18a46;text-underline-offset:5px}.word:focus-visible{outline-offset:2px}.definition[hidden]{display:none}.definition{flex:none;max-height:44%;overflow:auto;padding:14px 18px;border-top:1px solid #cbd8ce;background:#f3f6ee}.high .definition{background:#fff}.definition header{display:flex;align-items:center;gap:8px}.definition h3{font-size:18px;margin:0;overflow-wrap:anywhere}.definition h4{margin:12px 0 4px;font-size:12px}.definition p{margin:4px 0;overflow-wrap:anywhere}.definition ol{margin:4px 0;padding-left:20px}.definition a{color:inherit;text-underline-offset:2px}.definition .source{font-size:10px;color:#647572}.definition .pronunciation{font-size:12px;color:#647572}.definition .feedback{font-size:12px;color:#647572}
-</style><section class="reader" role="region" aria-label="Furigana reading view"><header class="header"><div><h2>Reading view</h2><small>Click a word for English / 日本語 definitions online</small></div><button type="button" aria-label="Close reading view">Close</button></header><div class="content" tabindex="0" aria-label="Document reading text" lang="ja"></div><section class="definition" aria-label="Word definition" aria-live="polite" hidden></section><p class="status" role="status" aria-live="polite"></p></section>`;
+
+[hidden]{display:none!important}.resize{position:absolute;left:-5px;top:16px;bottom:16px;width:10px;cursor:ew-resize;touch-action:none;border-radius:8px}.resize:hover,.resize:focus-visible{background:#206b5c55;outline:2px solid #206b5c}.correction-form{margin-top:10px;padding-top:10px;border-top:1px solid #cbd8ce}.correction-form label{display:block;font-size:11px;margin:6px 0}.correction-form input{display:block;width:100%;font:14px system-ui;padding:6px;border:1px solid #cbd8ce;border-radius:6px}.correction-actions{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.correction-actions button{margin:0;font-size:11px}.feedback[data-error=true]{color:#9c3c2d}input:focus-visible{outline:2px solid #c28637;outline-offset:2px}
+</style><div class="resize" role="separator" tabindex="0" aria-label="Reading panel width" aria-orientation="vertical" aria-valuemin="280" aria-valuemax="720" aria-valuenow="420"></div><section class="reader" role="region" aria-label="Furigana reading view"><header class="header"><div><h2>Reading view</h2><small>Click a word for English / 日本語 definitions online</small></div><button type="button" aria-label="Close reading view">Close</button></header><div class="content" tabindex="0" aria-label="Page reading text" lang="ja"></div><section class="definition" aria-label="Word definition" aria-live="polite" hidden></section><p class="status" role="status" aria-live="polite"></p></section>`;
+    this.resizeHandle=this.root.querySelector('.resize')!;
+    const finish=()=>{if(!this.resizeStart)return;this.resizeStart=undefined;void this.persistWidth();};
+    this.resizeHandle.addEventListener('pointerdown',event=>{
+      if(event.button!==0)return;event.preventDefault();
+      this.resizeStart={x:event.clientX,width:this.host.getBoundingClientRect().width};this.resizeHandle.setPointerCapture(event.pointerId);
+    });
+    this.resizeHandle.addEventListener('pointermove',event=>{if(this.resizeStart)this.setWidth(this.resizeStart.width+this.resizeStart.x-event.clientX);});
+    this.resizeHandle.addEventListener('pointerup',finish);
+    this.resizeHandle.addEventListener('pointercancel',finish);
+    this.resizeHandle.addEventListener('lostpointercapture',finish);
+    this.resizeHandle.addEventListener('keydown',event=>{
+      let width=this.width;
+      if(event.key==='ArrowLeft')width+=10;else if(event.key==='ArrowRight')width-=10;else if(event.key==='Home')width=280;else if(event.key==='End')width=720;else return;
+      event.preventDefault();this.setWidth(width);void this.persistWidth();
+    });
     this.content=this.root.querySelector('.content')!;this.status=this.root.querySelector('.status')!;
     this.definition=this.root.querySelector('.definition')!;
     this.root.querySelector('button')!.addEventListener('click',close);
@@ -49,6 +74,25 @@ export class ReadingPanel {
     });
     this.root.addEventListener('keydown',event=>{if((event as KeyboardEvent).key==='Escape' && !this.definition.hidden) {event.preventDefault();this.dismissDefinition(true);}});
   }
+  private setWidth(value:number) {
+    this.width=Math.max(Math.min(280,innerWidth-24),Math.min(720,innerWidth-24,value));
+    this.host.style.setProperty('--reader-width',`${this.width}px`);
+    this.resizeHandle.setAttribute('aria-valuemin',String(Math.min(280,innerWidth-24)));
+    this.resizeHandle.setAttribute('aria-valuemax',String(Math.min(720,innerWidth-24)));
+    this.resizeHandle.setAttribute('aria-valuenow',String(Math.round(this.width)));
+  }
+  private async persistWidth() {
+    try {await this.saveWidth(Math.max(280,this.width));}
+    catch {this.status.textContent='Could not save the panel width. Try resizing again.';}
+  }
+  appearance(settings:ReadingViewPreferences,appearance:Appearance) {
+    if(!this.resizeStart)this.setWidth(settings.width);
+    this.host.style.setProperty('--reader-font',`${settings.fontSize}px`);
+    this.host.style.setProperty('--reader-spacing',String(settings.spacing));
+    this.host.style.setProperty('--reader-ruby',`${.5*appearance.scale}em`);
+    this.root.querySelector('.reader')!.classList.toggle('high',appearance.contrast==='high');
+  }
+  ownsNode(node:Node) {return node===this.host || this.host.contains(node);}
   owns(event:Event) {return event.composedPath().includes(this.host);}
   loading(show:boolean,text:string,keepContent=false) {
     // Leave the readable snapshot and open definition in place while debouncing.
@@ -59,15 +103,13 @@ export class ReadingPanel {
     if(!this.host.isConnected)document.documentElement.append(this.host);
     if(this.content.childElementCount && !this.content.querySelector('.empty'))this.scrollTop=this.content.scrollTop;
     const p=document.createElement('p');p.className='empty';p.textContent=text;
-    this.content.replaceChildren(p);this.status.textContent='Only the active page’s visible text is processed.';
+    this.content.replaceChildren(p);this.status.textContent='Only visible page text is processed.';
   }
-  display(runs:ReadingRun[],context:string,settings:DocsReadingView,appearance:Appearance,top:number,limited:boolean) {
+  display(runs:ReadingRun[],context:string,settings:ReadingViewPreferences,appearance:Appearance,top:number,limited:boolean) {
     this.host.style.setProperty('--reader-top',`${Math.max(12,Math.min(top,innerHeight-180))}px`);
-    this.host.style.setProperty('--reader-spacing',String(settings.spacing));
-    this.host.style.setProperty('--reader-ruby',`${.5*appearance.scale}em`);
-    this.root.querySelector('.reader')!.classList.toggle('high',appearance.contrast==='high');
-    const lines=readingLines(runs),rendered=JSON.stringify([context,lines]);
-    const status=`${context==='pageless'?'Visible document text':'Active page · visible text'} · Text-only view${limited?' · View limit reached':''}.`;
+    this.appearance(settings,appearance);
+    const lines=context==='web'?runs.map(run=>({text:run.text,readings:run.readings,words:run.words})):readingLines(runs),rendered=JSON.stringify([context,lines]);
+    const status=`${context==='web'?'Visible webpage text':context==='pageless'?'Visible document text':'Active page · visible text'} · Text-only view${limited?' · View limit reached':''}.`;
     if(this.status.textContent!==status)this.status.textContent=status;
     // Docs frequently redraws identical canvas tiles. Preserve selection, scroll,
     // focus, and definitions when the readable text has not actually changed.
@@ -99,7 +141,15 @@ export class ReadingPanel {
         append(p,cursor,word.start);
         const button=document.createElement('button');button.type='button';button.className='word';
         const surface=line.text.slice(word.start,word.end);
-        button.dataset.word=word.lemma;button.dataset.surface=surface;button.dataset.reading=word.reading;
+        let pronunciation='',position=word.start,unknown=false;
+        for(const part of line.readings) {
+          if(part.start<position || part.end>word.end)continue;
+          pronunciation+=line.text.slice(position,part.start)+part.reading;position=part.end;
+          if(!part.reading)unknown=true;
+        }
+        pronunciation+=line.text.slice(position,word.end);
+        if(unknown || /[\p{Script=Han}々]/u.test(pronunciation))pronunciation=word.reading==='*'?'':word.reading;
+        button.dataset.word=word.lemma;button.dataset.surface=surface;button.dataset.reading=pronunciation;
         button.setAttribute('aria-label',`Define ${surface} in English and Japanese`);button.setAttribute('aria-pressed','false');
         button.title=`${surface} · English / 日本語 definitions`;
         append(button,word.start,word.end);p.append(button);cursor=word.end;
@@ -115,6 +165,37 @@ export class ReadingPanel {
     this.lookupVersion++;this.definition.hidden=true;this.definition.replaceChildren();
     this.selected?.setAttribute('aria-pressed','false');if(focus)this.selected?.focus();this.selected=undefined;
   }
+  private correctionControls(surface:string,reading:string) {
+    const toggle=document.createElement('button');toggle.type='button';toggle.textContent='Correct reading';toggle.style.margin='8px 0 0';
+    const form=document.createElement('form');form.className='correction-form';form.hidden=true;
+    const wordLabel=document.createElement('label');wordLabel.textContent='Word or name';
+    const word=document.createElement('input');word.value=surface;word.maxLength=80;word.required=true;word.autocomplete='off';wordLabel.append(word);
+    const readingLabel=document.createElement('label');readingLabel.textContent='Reading';
+    const kana=document.createElement('input');kana.value=reading;kana.maxLength=80;kana.required=true;kana.autocomplete='off';readingLabel.append(kana);
+    const actions=document.createElement('div');actions.className='correction-actions';
+    const save=document.createElement('button');save.type='submit';save.textContent='Save correction';
+    const restore=document.createElement('button');restore.type='button';restore.textContent='Restore automatic reading';
+    const cancel=document.createElement('button');cancel.type='button';cancel.textContent='Cancel';
+    const feedback=document.createElement('p');feedback.className='feedback';feedback.setAttribute('role','status');
+    const report=(text:string,error=false)=>{feedback.textContent=text;feedback.dataset.error=String(error);};
+    const sync=()=>{restore.hidden=!Object.hasOwn(this.overrides,word.value.trim().normalize('NFC'));};sync();word.oninput=sync;
+    toggle.onclick=()=>{form.hidden=!form.hidden;toggle.setAttribute('aria-expanded',String(!form.hidden));if(!form.hidden)kana.focus();};
+    toggle.setAttribute('aria-expanded','false');
+    cancel.onclick=()=>{form.hidden=true;toggle.setAttribute('aria-expanded','false');toggle.focus();};
+    form.onsubmit=async event=>{
+      event.preventDefault();save.disabled=true;
+      try {this.overrides=await saveCorrection(word.value,kana.value);report('Saved. Readings update automatically.');sync();}
+      catch(error) {report(error instanceof Error?error.message:'Could not save. Try again.',true);}
+      finally {save.disabled=false;}
+    };
+    restore.onclick=async()=>{
+      restore.disabled=true;
+      try {this.overrides=await removeCorrection(word.value.trim().normalize('NFC'));report('Automatic reading restored.');sync();}
+      catch {report('Could not restore the reading. Try again.',true);}
+      finally {restore.disabled=false;}
+    };
+    actions.append(save,restore,cancel);form.append(wordLabel,readingLabel,actions,feedback);this.definition.append(toggle,form);
+  }
   private async define(button:HTMLButtonElement) {
     this.dismissDefinition();const version=this.lookupVersion;
     this.selected=button;button.setAttribute('aria-pressed','true');
@@ -125,6 +206,7 @@ export class ReadingPanel {
     header.append(title,close);this.definition.append(header);
     const pronunciation=document.createElement('p');pronunciation.className='pronunciation';pronunciation.lang='ja';
     pronunciation.textContent=[button.dataset.reading,word!==surface?`辞書形: ${word}`:''].filter(Boolean).join(' · ');this.definition.append(pronunciation);
+    if(/[\p{Script=Han}々]/u.test(surface))this.correctionControls(surface,button.dataset.reading ?? '');
     const body=document.createElement('div');body.className='definition-body';body.setAttribute('aria-busy','true');
     const loading=document.createElement('p');loading.className='feedback';loading.textContent='Looking up English and Japanese definitions…';body.append(loading);this.definition.append(body);
     let result=this.definitions.get(word);

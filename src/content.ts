@@ -1,5 +1,5 @@
 import {ReadingPanel,type ReadingRun} from './reading-panel';
-import {appearance,appearanceForSite,validOverrides,docsReadingView,type Appearance} from './preferences';
+import {appearance,appearanceForSite,validOverrides,readingViewPreferences,panelEnabled,updateReadingView,type Appearance} from './preferences';
 import {AdaptivePacer} from './pacing';
 import { CollisionIndex } from './geometry';
 import type { Reading } from './shared';
@@ -24,8 +24,17 @@ let message = 'Starting offline furigana…';
 let statusState:'loading'|'active'|'paused'|'unavailable'='loading';
 let readingAppearance:Appearance=appearance(undefined);
 let overrides:Record<string,string>={};
-let viewSettings=docsReadingView(undefined);
-const reader=docs?new ReadingPanel(()=>{void chrome.storage.local.set({docsReadingView:{...viewSettings,enabled:false}});}):undefined;
+let legacyView:unknown;
+let rawView:unknown;
+let viewSettings=readingViewPreferences(undefined);
+const topFrame=window===window.top;
+const readingModeEnabled=()=>topFrame && panelEnabled(viewSettings,hostname);
+let reader:ReadingPanel|undefined;
+function ensureReader() {
+  if(reader || !readingModeEnabled())return;
+  reader=new ReadingPanel(()=>{void updateReadingView({},{hostname,enabled:false}).catch(()=>reader?.unavailable('Could not close the reading view. Try again.'));},width=>updateReadingView({width}));
+  reader.setOverrides(overrides);reader.appearance(viewSettings,readingAppearance);
+}
 let activeRequest:string|undefined;
 const pacer=new AdaptivePacer();
 let nextScanAt=0;
@@ -34,9 +43,9 @@ const inputDocuments = new WeakSet<Document>();
 function watchInput(target: Document) {
   if (inputDocuments.has(target)) return;
   inputDocuments.add(target);
-  target.addEventListener('compositionstart', () => { composing = true; schedule(); }, true);
-  target.addEventListener('compositionend', () => { composing = false; schedule(); }, true);
-  target.addEventListener('input', () => schedule(150,'edit'), true);
+  target.addEventListener('compositionstart', event => { if(reader?.owns(event))return;composing = true; schedule(); }, true);
+  target.addEventListener('compositionend', event => { if(reader?.owns(event))return;composing = false; schedule(); }, true);
+  target.addEventListener('input', event => {if(!reader?.owns(event))schedule(150,'edit');}, true);
 }
 function watchDocsInputs(root: ParentNode) {
   const frames = [...root.querySelectorAll<HTMLIFrameElement>('iframe.docs-texteventtarget-iframe')];
@@ -57,15 +66,16 @@ const visible = (r: DOMRect) => r.width > 0 && r.height > 0 && r.bottom > 0 && r
 function allowed() { return enabled && !excluded.includes(hostname) && !document.hidden && !composing; }
 function clear() { layer.replaceChildren(); }
 function schedule(delay = 150, activity?:'scroll'|'edit') {
+  ensureReader();
   revision++; clear(); window.clearTimeout(timer);
   if(activeRequest) {void chrome.runtime.sendMessage({type:'cancel-tokenize',requestId:activeRequest}).catch(()=>{});activeRequest=undefined;}
   if(activity)delay=pacer.mark(activity);
   // Keep routine Docs panel updates behind a trailing quiet period. Explicit
   // settings/visibility changes still take effect immediately (delay === 0).
-  if(docs && viewSettings.enabled && delay>0)delay=Math.max(400,delay);
+  if(readingModeEnabled() && delay>0)delay=Math.max(400,delay);
   statusState=allowed()?'loading':'paused';
   message=!enabled || excluded.includes(hostname)?'Readings are paused for this page.':document.hidden?'Paused while this tab is in the background.':composing?'Waiting for text composition to finish.':activity==='scroll'?'Waiting for scrolling to settle…':activity==='edit'?'Waiting for editing to settle…':'Updating visible readings…';
-  reader?.loading(viewSettings.enabled && enabled && !excluded.includes(hostname) && !document.hidden,message,allowed());
+  reader?.loading(readingModeEnabled() && enabled && !excluded.includes(hostname) && !document.hidden,message,allowed());
   if (allowed()) {nextScanAt=performance.now()+delay;timer = window.setTimeout(() => { if (!running) void scan(); }, delay);}
 }
 function registerPages(root: ParentNode) {
@@ -88,7 +98,7 @@ function region(): Element | undefined {
   if (pages.size) return best;
   return document.querySelector('.kix-appview-editor') ?? undefined;
 }
-interface Source { orderBox?:DOMRect; text: string; rect: (start: number, end: number) => DOMRect | undefined; fontSize: number; color: string; background: string; block?: Element; identity?: Text }
+interface Source { sourceOffset?:number; orderBox?:DOMRect; text: string; rect: (start: number, end: number) => DOMRect | undefined; fontSize: number; color: string; background: string; block?: Element; identity?: Text }
 function textSource(node: Text): Source | undefined {
   const parent = node.parentElement!;
   let block = parent;
@@ -109,7 +119,7 @@ function textSource(node: Text): Source | undefined {
   }
   const text = node.data.slice(offset, offset + 2000);
   if (!text.trim()) return;
-  return {text, block, identity:node, fontSize:parseFloat(style.fontSize), color:style.color, background:style.backgroundColor,
+  return {text, block, identity:node, sourceOffset:offset, fontSize:parseFloat(style.fontSize), color:style.color, background:style.backgroundColor,
     rect(start, end) {
       if (!node.isConnected) return;
       const range = document.createRange();
@@ -117,6 +127,38 @@ function textSource(node: Text): Source | undefined {
       const rects = [...range.getClientRects()].filter(r => r.width > 0);
       return rects.length === 1 && visible(rects[0]) ? rects[0] : undefined;
     }};
+}
+// The panel can reflow text: unlike overlays, a source may span several lines.
+// Split only at viewport boundaries, yielding each measurement cooperatively.
+function* visibleTextSources(node:Text):Generator<Source|undefined> {
+  const base=textSource(node);if(!base)return;
+  const origin=base.sourceOffset ?? 0,range=document.createRange();
+  const pending:[number,number][]=[[0,base.text.length]],parts:{start:number;end:number;box:DOMRect}[]=[];
+  while(pending.length) {
+    const [start,end]=pending.pop()!;
+    range.setStart(node,origin+start);range.setEnd(node,origin+end);
+    const rects=[...range.getClientRects()].filter(rect=>rect.width>0 && rect.height>0);
+    yield undefined;
+    const shown=rects.filter(visible);if(!shown.length)continue;
+    if(shown.length===rects.length || end-start<=1) {
+      parts.push({start,end,box:range.getBoundingClientRect()});continue;
+    }
+    let mid=start+Math.floor((end-start)/2);
+    // Do not split a supplementary character's UTF-16 surrogate pair.
+    if(mid>start && /[\uDC00-\uDFFF]/.test(base.text[mid]))mid--;
+    if(mid===start)mid=Math.min(end,start+2);
+    if(mid===end) {parts.push({start,end,box:range.getBoundingClientRect()});continue;}
+    pending.push([mid,end],[start,mid]);
+  }
+  const merged:typeof parts=[];
+  for(const part of parts) {
+    const previous=merged.at(-1);
+    if(previous?.end===part.start)previous.end=part.end;else merged.push({...part});
+  }
+  for(const part of merged) {
+    const text=base.text.slice(part.start,part.end);if(!text.trim())continue;
+    yield {...base,text,sourceOffset:origin+part.start,orderBox:part.box,rect:()=>part.box};
+  }
 }
 const measure = document.createElement('canvas').getContext('2d')!;
 function docsSource(element: Element): Source | undefined {
@@ -164,21 +206,21 @@ function docsSource(element: Element): Source | undefined {
   }};
 }
 // Explicit traversal keeps each step interruptible, including huge offscreen subtrees.
-function* sources(root: Element): Generator<Source | undefined> {
+function* sources(root: Element,panelMode=false): Generator<Source | undefined> {
   let node: Node | null = root;
   while (node) {
     let descend = true;
     let source: Source | undefined;
     if (node instanceof Element) {
-      if (node === host || node.matches('script,style,noscript,ruby,rt,input,textarea,select,[contenteditable]:not([contenteditable="false"])')) descend = false;
+      if (node === host || reader?.ownsNode(node) || node.matches('script,style,noscript,ruby,rt,input,textarea,select,[contenteditable]:not([contenteditable="false"])')) descend = false;
       else if (node !== root) {
         const r = node.getBoundingClientRect();
         const style = getComputedStyle(node);
         if (style.display === 'none' || style.visibility === 'hidden' || (r.width > 0 && r.height > 0 && !visible(r))) descend = false;
       }
       if (descend && docs && node.matches('svg rect[aria-label]')) { source = docsSource(node); descend = false; }
-      if (descend && !docs && node.shadowRoot) { observeShadow(node.shadowRoot); yield* sources(node.shadowRoot as unknown as Element); }
-    } else if (!docs && node instanceof Text && node.parentElement) source = textSource(node);
+      if (descend && !docs && node.shadowRoot) { observeShadow(node.shadowRoot); yield* sources(node.shadowRoot as unknown as Element,panelMode); }
+    } else if (!docs && node instanceof Text && node.parentElement) {if(panelMode)yield* visibleTextSources(node);else source = textSource(node);}
     yield source;
     if (descend && node.firstChild) { node = node.firstChild; continue; }
     while (node && node !== root && !node.nextSibling) node = node.parentNode;
@@ -188,12 +230,12 @@ function* sources(root: Element): Generator<Source | undefined> {
 }
 // Anchor discovery to hit-tested viewport elements rather than walking a flat
 // document with potentially hundreds of thousands of offscreen siblings.
-function* webSources(): Generator<Source | undefined> {
-  const seeds = new Set<Element>(), seen = new Set<Text>();
+function* webSources(panelMode=false): Generator<Source | undefined> {
+  const seeds = new Set<Element>(), seen = new Map<Text,Set<number>>();
   let inspected = 0;
   const dx = Math.max(64, Math.ceil(innerWidth / 16)), dy = Math.max(16,Math.ceil(innerHeight / 100));
   for (let y = 4; y < innerHeight; y += dy) for (let x = 4; x < innerWidth; x += dx) {
-    let element = document.elementFromPoint(x,y);
+    let element = panelMode?document.elementsFromPoint(x,y).find(element=>element!==host && !reader?.ownsNode(element)) ?? null:document.elementFromPoint(x,y);
     while (element?.shadowRoot) {
       observeShadow(element.shadowRoot);
       const inner = element.shadowRoot.elementFromPoint(x,y);
@@ -205,12 +247,12 @@ function* webSources(): Generator<Source | undefined> {
     if (element.closest('ruby,rt,input,textarea,select,[contenteditable]:not([contenteditable="false"])')) continue;
     seeds.add(element);
     let local = 0;
-    for (const source of sources(element)) {
+    for (const source of sources(element,panelMode)) {
       // Bounds traversal even when a viewport element contains a huge flat tree.
       if (++local > 128 || ++inspected > 4096) break;
       if (source?.identity) {
-        if (seen.has(source.identity)) { yield undefined; continue; }
-        seen.add(source.identity);
+        let offsets=seen.get(source.identity);if(!offsets) {offsets=new Set();seen.set(source.identity,offsets);}
+        const offset=source.sourceOffset ?? 0;if(offsets.has(offset)) {yield undefined;continue;}offsets.add(offset);
       }
       yield source;
     }
@@ -249,7 +291,7 @@ async function scan() {
   running = true;
   const version = revision;
   let count = 0, attempted = 0, found = false, skippedSpace = 0, unknown = 0;
-  const readingMode=docs && viewSettings.enabled;
+  const readingMode=readingModeEnabled();
   const readingRuns:ReadingRun[]=[];
   const runMap=new Map<Source,ReadingRun>();
   let panelCharacters=0,panelLimited=false;
@@ -291,6 +333,56 @@ async function scan() {
         if (prepared.length >= 2000) break;
       }
     }
+    if(readingMode && !docs) {
+      prepared=[];let started=performance.now();
+      const discovered:Source[]=[];
+      for(const source of webSources(true)) {
+        if(performance.now()-started>=pacer.budget()) {await frame();started=performance.now();if(version!==revision || !allowed())return;}
+        if(!source)continue;discovered.push(source);
+        if(discovered.length>=2000) {panelLimited=true;break;}
+      }
+      // Order shadow content at its host's position, rather than hit-test order.
+      const paths=new Map<Node,Node[]>();
+      const path=(node:Node)=>{
+        let result=paths.get(node);if(result)return result;
+        result=[];let current:Node|null=node;
+        while(current) {result.unshift(current);current=current instanceof ShadowRoot?current.host:current.parentNode;}
+        paths.set(node,result);return result;
+      };
+      discovered.sort((a,b)=>{
+        if(a.identity===b.identity)return (a.sourceOffset ?? 0)-(b.sourceOffset ?? 0);
+        const first=path(a.identity!),second=path(b.identity!);let i=0;
+        while(i<first.length && i<second.length && first[i]===second[i])i++;
+        if(i===first.length)return -1;if(i===second.length)return 1;
+        const order=first[i].compareDocumentPosition(second[i]);
+        return order & Node.DOCUMENT_POSITION_FOLLOWING?-1:order & Node.DOCUMENT_POSITION_PRECEDING?1:0;
+      });
+      let previousSource:Source|undefined;
+      for(const source of discovered) {
+        if(panelCharacters+source.text.length>16000) {panelLimited=true;break;}
+        panelCharacters+=source.text.length;
+        const previous=prepared.at(-1);
+        if(previous && previous.block===source.block && previous.text.length+source.text.length<2000) {
+          // Preserve actual inline whitespace instead of inventing spaces between kanji.
+          const contiguous=!previousSource || previousSource.identity!==source.identity || (previousSource.sourceOffset ?? 0)+previousSource.text.length===source.sourceOffset;
+          // A hard line break between inline runs must survive in the text-only view.
+          let hardBreak=false,node:Node|null=previousSource?.identity ?? null,steps=0;
+          if(node?.getRootNode()===source.identity?.getRootNode() && node!==source.identity)while(node && node!==source.identity && steps++<32) {
+            if(node.firstChild)node=node.firstChild;
+            else {while(node && !node.nextSibling && node!==source.block)node=node.parentNode;node=node===source.block?null:node?.nextSibling ?? null;}
+            if(node instanceof HTMLBRElement)hardBreak=true;
+          }
+          if(!contiguous || hardBreak) {if(++panelCharacters>16000) {panelLimited=true;break;}previous.text+='\n';}
+          previous.text+=source.text;
+        } else prepared.push({...source});
+        previousSource=source;
+      }
+      for(const source of prepared) {
+        const box=source.orderBox!;
+        const run:ReadingRun={text:source.text,top:box.top,left:box.left,right:box.right,readings:[]};
+        readingRuns.push(run);runMap.set(source,run);
+      }
+    }
     const iterator = readingMode?prepared![Symbol.iterator]():groupedSources(root,prepared);
     let done = false;
     while (!done && attempted < 500 && version === revision && allowed()) {
@@ -315,9 +407,9 @@ async function scan() {
     if(docs && !prepared?.length) {message='Docs text is unavailable. Reload this document after installation. This editor version may be unsupported.';statusState='unavailable';if(readingMode)reader?.unavailable(message);}
     else if(!found)message='No visible kanji in this view.';
     else message=`Active — ${layer.childElementCount} visible readings${docs ? (activePage ? ' on the active page' : ' in the editor viewport') : ''}.${skippedSpace ? ` Tight spacing: ${skippedSpace} omitted.` : ''}${unknown ? ` Unknown words: ${unknown}. Add a local correction in the menu.` : ''}${attempted>=500 ? ' View limit reached; scroll to reveal more.' : ''}`;
-    if(readingMode && prepared?.length) {
-      reader?.display(readingRuns,activePage?String([...pages].indexOf(activePage)):'pageless',viewSettings,readingAppearance,editorClip?.top ?? 100,panelLimited || attempted>=500);
-      message=`Reading view — ${count} readings in ${activePage?'the active page’s visible text':'the editor viewport'}.${unknown?` Unknown words: ${unknown}. Add a local correction in the menu.`:''}${panelLimited || attempted>=500?' View limit reached; scroll to reveal more.':''}`;
+    if(readingMode && (!docs || prepared?.length)) {
+      reader?.display(readingRuns,!docs?'web':activePage?String([...pages].indexOf(activePage)):'pageless',viewSettings,readingAppearance,(docs?editorClip?.top:12) ?? 100,panelLimited || attempted>=500);
+      message=`Reading view — ${count} readings in ${!docs?'the visible webpage text':activePage?'the active page’s visible text':'the editor viewport'}.${unknown?` Unknown words: ${unknown}. Add a local correction in the menu.`:''}${panelLimited || attempted>=500?' View limit reached; scroll to reveal more.':''}`;
     }
     async function process(batch: Source[]) {
       if (!batch.length || version !== revision || !allowed()) return;
@@ -385,23 +477,29 @@ async function scan() {
 }
 chrome.runtime.onMessage.addListener((request, _sender, respond) => { if (request?.type === 'status') respond({message,state:statusState}); });
 chrome.storage.onChanged.addListener((changes, area) => {
-  if(area!=='local' || !['enabled','excluded','siteAppearance','readingOverrides','docsReadingView'].some(key=>key in changes))return;
+  if(area!=='local' || !['enabled','excluded','siteAppearance','readingOverrides','docsReadingView','readingView'].some(key=>key in changes))return;
+  const wasReading=readingModeEnabled();
   if(changes.enabled)enabled=changes.enabled.newValue!==false;
   if(changes.excluded)excluded=Array.isArray(changes.excluded.newValue)?changes.excluded.newValue:[];
   if(changes.siteAppearance)readingAppearance=appearanceForSite(changes.siteAppearance.newValue,hostname);
-  if(changes.readingOverrides)overrides=validOverrides(changes.readingOverrides.newValue);
-  if(changes.docsReadingView)viewSettings=docsReadingView(changes.docsReadingView.newValue);
+  if(changes.readingOverrides) {overrides=validOverrides(changes.readingOverrides.newValue);reader?.setOverrides(overrides);}
+  if(changes.docsReadingView)legacyView=changes.docsReadingView.newValue;
+  if(changes.readingView)rawView=changes.readingView.newValue;
+  viewSettings=readingViewPreferences(rawView,legacyView);
+  if(wasReading===readingModeEnabled() && !changes.enabled && !changes.excluded && !changes.readingOverrides && (readingModeEnabled() || !changes.siteAppearance)) {
+    reader?.appearance(viewSettings,readingAppearance);return;
+  }
   schedule(0);
 });
 async function start() {
-  const state = await chrome.storage.local.get({enabled:true, excluded:[],siteAppearance:{},readingOverrides:{},docsReadingView:{}}); enabled = state.enabled !== false; excluded = Array.isArray(state.excluded) ? state.excluded : [];
-  readingAppearance=appearanceForSite(state.siteAppearance,hostname);overrides=validOverrides(state.readingOverrides);viewSettings=docsReadingView(state.docsReadingView);
+  const state = await chrome.storage.local.get({enabled:true, excluded:[],siteAppearance:{},readingOverrides:{},docsReadingView:{},readingView:null}); enabled = state.enabled !== false; excluded = Array.isArray(state.excluded) ? state.excluded : [];
+  readingAppearance=appearanceForSite(state.siteAppearance,hostname);overrides=validOverrides(state.readingOverrides);legacyView=state.docsReadingView;rawView=state.readingView;viewSettings=readingViewPreferences(rawView,legacyView);reader?.setOverrides(overrides);reader?.appearance(viewSettings,readingAppearance);
   if (docs) { registerPages(document); watchDocsInputs(document); }
   watchInput(document);
   const observer = new MutationObserver(records => {
     let relevant = false;
     for (const record of records) {
-      if (record.target === host || host.contains(record.target)) continue;
+      if (record.target === host || host.contains(record.target) || reader?.ownsNode(record.target)) continue;
       const element = record.target instanceof Element ? record.target : record.target.parentElement;
       if (docs && element?.closest('.kix-cursor,.kix-selection-overlay,.kix-selection-overlay-content')) continue;
       if (docs && record.type !== 'childList' && element?.closest('.kix-page') && element.closest('.kix-page') !== activePage) continue;
@@ -413,7 +511,7 @@ async function start() {
   mutationObserver = observer;
   observer.observe(document.body, observerOptions);
   document.addEventListener('scroll', event => {if(!reader?.owns(event))schedule(100,'scroll');}, {capture:true, passive:true});
-  document.addEventListener('load', () => schedule(), true);
+  document.addEventListener('load', event => {if(!reader?.owns(event))schedule();}, true);
   window.addEventListener('resize', () => schedule(100));
   window.visualViewport?.addEventListener('resize', () => schedule(100));
   document.addEventListener('visibilitychange', () => schedule(0));

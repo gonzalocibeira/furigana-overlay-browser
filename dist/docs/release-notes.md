@@ -1,5 +1,15 @@
 # Release notes
 
+## 0.5.0 · 14 October 2026
+
+- The reading panel now works on supported HTTP/HTTPS webpages as well as Google Docs, following visible text with bounded discovery and the existing quiet-period debounce. Activation is remembered per hostname. Existing Docs preferences migrate without enabling other websites.
+- Choose 16–32 px panel text, or resize the panel from its left edge using a pointer or keyboard. Font size, spacing, and width are saved across sites. Appearance updates preserve panel content, selection, and definitions without retokenizing.
+- Correct a kanji word directly in its detail card, including while definitions are unavailable. Restore automatic readings from the same form. Saved readings are reflected in pronunciation metadata, including multi-token corrections.
+- Search corrections by word or reading. Export a version 1 JSON backup or import one up to 256 KiB. Imports keep existing readings on conflicts and reject malformed or over-capacity backups without partial changes.
+- No new dependencies or permissions. Furigana stays offline; explicit word definitions use the same Wiktionary services on webpages and Docs.
+
+Reload the extension from the rebuilt `dist/` folder, then reload open tabs. The panel still uses text-only extraction; browser-protected pages, images, PDFs, unsupported canvas editors, and cross-frame aggregation remain unsupported. Live Google Docs compatibility remains experimental.
+
 ## 0.4.0 · 14 October 2026
 
 This release adds bilingual word definitions, steadier Google Docs reading-panel updates, and better readings for vocabulary entries. It includes all code changes made on 14 October 2026.
