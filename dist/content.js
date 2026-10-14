@@ -670,10 +670,45 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
       var message = "Starting offline furigana\u2026";
       var statusState = "loading";
       var toolbarAvailability = "unavailable";
+      var contextInvalidated = false;
+      function invalidateContext() {
+        if (contextInvalidated) return;
+        contextInvalidated = true;
+        revision++;
+        window.clearTimeout(timer);
+        activeRequest = void 0;
+        mutationObserver?.disconnect();
+        pageObserver.disconnect();
+        clear();
+        host.remove();
+        reader?.loading(false, "");
+        message = "Extension updated or reloaded. Reload this page to restore readings.";
+        statusState = "unavailable";
+        toolbarAvailability = "unavailable";
+      }
+      function extensionAvailable() {
+        if (contextInvalidated) return false;
+        try {
+          if (chrome.runtime.id) return true;
+        } catch {
+        }
+        invalidateContext();
+        return false;
+      }
+      async function sendToExtension(request) {
+        if (!extensionAvailable()) throw new Error("Extension context invalidated.");
+        try {
+          return await chrome.runtime.sendMessage(request);
+        } catch (error) {
+          if (/extension context invalidated/i.test(String(error))) invalidateContext();
+          throw error;
+        }
+      }
       function setToolbarAvailability(value) {
+        if (!extensionAvailable()) return;
         if (toolbarAvailability === value) return;
         toolbarAvailability = value;
-        if (window === window.top) void chrome.runtime.sendMessage({ type: "toolbar-status-changed" }).catch(() => {
+        if (window === window.top) void sendToExtension({ type: "toolbar-status-changed" }).catch(() => {
         });
       }
       var readingAppearance = appearance(void 0);
@@ -737,21 +772,23 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
       var editorClip;
       var visible = (r) => r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth;
       function allowed() {
-        return enabled && !excluded.includes(hostname) && !document.hidden && !composing;
+        return extensionAvailable() && enabled && !excluded.includes(hostname) && !document.hidden && !composing;
       }
       function clear() {
         layer.replaceChildren();
       }
       function schedule(delay = 150, activity) {
+        if (!extensionAvailable()) return;
         ensureReader();
         revision++;
         clear();
         window.clearTimeout(timer);
         if (activeRequest) {
-          void chrome.runtime.sendMessage({ type: "cancel-tokenize", requestId: activeRequest }).catch(() => {
+          void sendToExtension({ type: "cancel-tokenize", requestId: activeRequest }).catch(() => {
           });
           activeRequest = void 0;
         }
+        if (contextInvalidated) return;
         if (activity) delay = pacer.mark(activity);
         if (readingModeEnabled() && delay > 0) delay = Math.max(400, delay);
         statusState = allowed() ? "loading" : "paused";
@@ -1232,7 +1269,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
             activeRequest = requestId;
             let response;
             try {
-              response = await chrome.runtime.sendMessage({ type: "tokenize", requestId, texts: batch.map((s) => s.text), overrides, includeWords: readingMode });
+              response = await sendToExtension({ type: "tokenize", requestId, texts: batch.map((s) => s.text), overrides, includeWords: readingMode });
             } finally {
               if (activeRequest === requestId) activeRequest = void 0;
             }
