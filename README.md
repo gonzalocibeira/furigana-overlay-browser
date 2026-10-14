@@ -4,7 +4,7 @@
 
 <h1 align="center">Furigana Overlay Browser</h1>
 <p align="center"><strong>A little help above the kanji.</strong></p>
-<p align="center">Automatic Japanese readings for webpages and Google Docs.<br>Processed on your device, with the dictionary included.</p>
+<p align="center">Automatic Japanese readings for webpages and Google Docs.<br>Furigana runs on your device. Optional word definitions use Wiktionary online.</p>
 <p align="center">Version <strong>0.4.0</strong> · 14 October 2026</p>
 <p align="center">
   <a href="#install-in-chrome">Install in Chrome</a> ·
@@ -21,7 +21,7 @@
 | Read as you browse | Keep your work intact | Stay in control |
 | --- | --- | --- |
 | Furigana appears automatically on visible Japanese text. | Original webpage text and Google Docs formatting stay unchanged. | Pause a site, adjust the appearance, or save your own readings. |
-| **Offline processing** with a bundled dictionary. | **Google Docs support** with an optional extra-space reading panel. | **No account or API key** needed. Settings and corrections stay on this device. |
+| **Offline furigana** uses bundled reading dictionaries. | **Google Docs reading panel** adds extra spacing and optional online word definitions. | **No extension account or API key** needed. Settings and corrections are saved on this device. |
 
 ## Release notes
 
@@ -44,7 +44,7 @@ The ready-to-load **Furigana Overlay Browser** extension is included in [`dist/`
 2. **Extract and keep the folder.** Put it somewhere permanent, such as `Documents/Furigana`.
 3. **Open Chrome's extensions page.** Enter `chrome://extensions` in the address bar and turn on **Developer mode**.
 4. **Load the extension.** Click **Load unpacked** and select the **`dist` folder** inside the extracted repository. It contains `manifest.json`.
-5. **Reload your tabs and read.** Furigana starts automatically. The first page may take a moment while the local dictionary loads.
+5. **Reload your tabs and read.** Furigana starts automatically. The first page may take a moment while the bundled reading dictionary loads.
 
 **Tip:** Pin **Furigana Overlay Browser** from Chrome's puzzle-piece **Extensions** menu. Look for **字** with **じ** above it.
 
@@ -111,9 +111,13 @@ For isolated vocabulary and translation lines such as `出口 = salida`, reading
 
 Readings shrink or are omitted when space is tight to preserve the original line spacing. Try a smaller reading size or the extra-space Docs panel when you need more room.
 
-## Private by design
+## Privacy and online lookups
 
-**Furigana is processed on your device.** Readings use bundled Kuromoji/IPADIC dictionaries. Optional word definitions in the Google Docs reading panel contact Wiktionary only when you click a word, sending its dictionary form. No full document or surrounding sentence is sent. There are no analytics or accounts. Only your settings and saved corrections are persisted.
+**Furigana readings run on your device.** The extension uses bundled Kuromoji/IPADIC reading dictionaries and sends no text to an external service to generate furigana.
+
+**Word definitions use Wiktionary online.** Opening a definition in the Google Docs reading panel sends that word's dictionary form to the English and Japanese Wiktionary services. Wiktionary receives the lookup word and normal connection information, including your IP address. The extension does not send the surrounding sentence or full document. Lookups require an internet connection; cached definitions stay in extension memory.
+
+The extension has no analytics or account requirement. It saves only your settings and reading corrections to local storage.
 
 <details>
 <summary><strong>Permissions and local storage explained</strong></summary>
@@ -122,7 +126,7 @@ Japanese readings are processed locally with bundled Kuromoji/IPADIC dictionarie
 
 - The extension needs access to HTTP/HTTPS pages to add readings automatically without a per-page click. You can narrow access using Chrome's extension site-access controls; it will only run on permitted sites.
 - It requests local storage for preferences and user-entered corrections, plus an offscreen document for the tokenizer worker.
-- Extracted text and dictionary caches stay in memory. Only settings and the corrections you enter are persisted in `chrome.storage.local`.
+- Extracted text, reading caches, and definition caches stay in extension memory. Only settings and the corrections you enter are persisted in `chrome.storage.local`.
 - It does not request access to your Google account or the Google Docs API.
 - The website or Google Docs itself continues using its normal network connection.
 
@@ -173,7 +177,7 @@ There are no automatic Web Store updates.
 
 ## Why I built this
 
-I couldn't find a good option for adding furigana in Google Docs. I wanted readings to appear automatically, work offline, and leave the original document unchanged. That grew into this extension: a little help while browsing, with extra room to read when you need it.
+I couldn't find a good option for adding furigana in Google Docs. I wanted readings to appear automatically, work offline, and leave the original document unchanged. That grew into this extension: a little help while browsing, with extra room to read when you need it. The reading panel now also offers optional online word definitions from Wiktionary.
 
 ## For developers
 
@@ -189,7 +193,7 @@ npm run typecheck
 npm test
 ```
 
-`npm run build` regenerates the included `dist/` folder. Development dependency installation requires internet access; the installed extension works without an external processing service.
+`npm run build` regenerates the included `dist/` folder. Development dependency installation requires internet access. Furigana readings require no external service; optional word definitions contact Wiktionary and require an internet connection.
 
 The test suite has **27 tests**, including automatic annotations, unchanged source/layout, a 100,000-node webpage, a 100-page Docs fixture, cancellation, IME handling, settings, corrections, vocabulary/name disambiguation, the reading panel, debounced refreshes, and bilingual word definitions. Browser integration tests use a temporary profile and localhost server. They default to Brave's standard macOS executable; set `CHROMIUM_PATH` to an extension-capable Chromium executable elsewhere. Chrome distributions that disable command-line extension loading cannot run these integration tests. Your normal browser profile and Google account are not used.
 
@@ -200,7 +204,7 @@ The README uses real-use screenshots supplied by the project owner. Earlier fixt
 <details>
 <summary><strong>Performance and architecture</strong></summary>
 
-Work is bounded to visible content. Processing pauses in background tabs, waits for scrolling/editing to settle, and cancels stale queued work. Docs measurements are cached within each scan; collision checks inspect nearby glyphs. Dictionary caches and analysis batches have fixed limits. The reading panel is capped at 16,000 characters / 2,000 runs and 500 reading candidates.
+Furigana work is bounded to visible content. Reading analysis pauses in background tabs, waits for scrolling/editing to settle, and cancels stale queued work. Docs measurements are cached within each scan; collision checks inspect nearby glyphs. Reading caches and analysis batches have fixed limits. The reading panel is capped at 16,000 characters / 2,000 runs and 500 reading candidates. Online definition requests happen only when you open a word's definition, with up to 100 lookup results cached in panel memory.
 
 See [technical notes](docs/technical-notes.md) for the architecture, exact budgets, and compatibility details.
 
