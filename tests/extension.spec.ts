@@ -358,3 +358,58 @@ test('Docs word clicks show bilingual definitions, use lemmas, cache results, an
     await settings({docsReadingView:{enabled:false,spacing:2.8}});await page.close();
   }
 });
+
+test('Docs panel debounces edits and preserves text, scroll, focus, and definitions during unchanged redraws',async()=>{
+  await settings({docsReadingView:{enabled:true,spacing:2.8}});
+  await context.route('https://*.wiktionary.org/w/api.php*',route=>{
+    const ja=new URL(route.request().url()).hostname.startsWith('ja.');
+    return route.fulfill({json:{parse:{title:'学校',text:`<h2>${ja?'日本語':'Japanese'}</h2><h3>${ja?'名詞':'Noun'}</h3><ol><li>${ja?'学ぶための施設。':'A school.'}</li></ol>`}}});
+  });
+  const page=await context.newPage();
+  try {
+    await page.route('https://docs.google.com/document/d/debounce/edit',route=>route.fulfill({contentType:'text/html',body:`<!doctype html><meta charset="utf-8"><style>body{margin:0}.kix-appview-editor{position:absolute;top:100px;width:900px;height:600px}</style><div id="toolbar">Saved</div><div class="kix-appview-editor"><svg width="900" height="600"><g data-font-css="24px system-ui" fill="none">${Array.from({length:15},(_,i)=>`<rect x="40" y="${40+i*32}" width="300" height="28" aria-label="学校で日本語を勉強する。"/>`).join('')}</g></svg></div>`}));
+    await page.goto('https://docs.google.com/document/d/debounce/edit');
+    await expect.poll(async()=> (await readerEval(page,readerSnapshot))?.readings,{timeout:30000}).toContain('がっこう');
+    await readerEval(page,`function(){this.querySelector('[data-surface="学校"]').click()}`);
+    await expect.poll(()=>readerEval(page,`function(){return this.querySelector('.definition-body')?.getAttribute('aria-busy')}`)).toBe('false');
+    await readerEval(page,`function(){
+      const content=this.querySelector('.content'),word=this.querySelector('[data-surface="学校"]');word.focus();content.scrollTop=100;
+      this.testRefresh={word,scrollTop:content.scrollTop,changes:0};
+      this.testObserver=new MutationObserver(()=>this.testRefresh.changes++);this.testObserver.observe(content,{childList:true});
+    }`);
+    // Several separate event bursts must neither blank the content immediately
+    // nor replace it after a scan that finds the same words.
+    for(let burst=0;burst<2;burst++) {
+      await page.evaluate(async()=>{
+        for(let i=0;i<6;i++) {
+          document.querySelector('#toolbar')!.textContent=`Saved ${i}`;
+          document.querySelector('rect')!.setAttribute('width',String(300+i));
+          document.dispatchEvent(new Event('scroll'));
+          await new Promise(resolve=>setTimeout(resolve,80));
+        }
+      });
+      await page.waitForTimeout(650);
+    }
+    const stable=await readerEval(page,`function(){return {changes:this.testRefresh.changes,sameWord:this.testRefresh.word===this.querySelector('[data-surface="学校"]'),focused:this.activeElement===this.testRefresh.word,scrollTop:this.querySelector('.content').scrollTop,expectedScroll:this.testRefresh.scrollTop,definitionHidden:this.querySelector('.definition').hidden}}`);
+    expect(stable).toMatchObject({changes:0,sameWord:true,focused:true,definitionHidden:false});
+    expect(stable.scrollTop).toBe(stable.expectedScroll);expect(stable.scrollTop).toBeGreaterThan(0);
+    await page.evaluate(async()=>{
+      const rect=document.querySelector('rect')!;
+      for(const text of ['病気です。','仕事です。','図書館です。','先生です。']) {
+        rect.setAttribute('aria-label',text);
+        await new Promise(resolve=>setTimeout(resolve,100));
+      }
+    });
+    expect(await readerEval(page,`function(){return this.testRefresh.changes}`)).toBe(0);
+    expect((await readerEval(page,readerSnapshot)).lines[0]).toBe('学校で日本語を勉強する。');
+    await expect.poll(async()=> (await readerEval(page,readerSnapshot))?.lines[0]).toBe('先生です。');
+    expect(await readerEval(page,`function(){return this.testRefresh.changes}`)).toBe(1);
+    expect(await readerEval(page,`function(){return this.querySelector('.definition').hidden}`)).toBe(true);
+    // Pause still removes the panel immediately, even with a pending refresh.
+    await page.locator('rect').first().evaluate(el=>el.setAttribute('aria-label','仕事です。'));
+    await settings({enabled:false});await expect(page.locator('fob-reading-view')).toHaveCount(0);
+  } finally {
+    await context.unroute('https://*.wiktionary.org/w/api.php*');
+    await settings({enabled:true,docsReadingView:{enabled:false,spacing:2.8}});await page.close();
+  }
+});

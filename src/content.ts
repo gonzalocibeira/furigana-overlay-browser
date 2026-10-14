@@ -60,9 +60,12 @@ function schedule(delay = 150, activity?:'scroll'|'edit') {
   revision++; clear(); window.clearTimeout(timer);
   if(activeRequest) {void chrome.runtime.sendMessage({type:'cancel-tokenize',requestId:activeRequest}).catch(()=>{});activeRequest=undefined;}
   if(activity)delay=pacer.mark(activity);
+  // Keep routine Docs panel updates behind a trailing quiet period. Explicit
+  // settings/visibility changes still take effect immediately (delay === 0).
+  if(docs && viewSettings.enabled && delay>0)delay=Math.max(400,delay);
   statusState=allowed()?'loading':'paused';
   message=!enabled || excluded.includes(hostname)?'Readings are paused for this page.':document.hidden?'Paused while this tab is in the background.':composing?'Waiting for text composition to finish.':activity==='scroll'?'Waiting for scrolling to settle…':activity==='edit'?'Waiting for editing to settle…':'Updating visible readings…';
-  reader?.loading(viewSettings.enabled && enabled && !excluded.includes(hostname) && !document.hidden,message);
+  reader?.loading(viewSettings.enabled && enabled && !excluded.includes(hostname) && !document.hidden,message,allowed());
   if (allowed()) {nextScanAt=performance.now()+delay;timer = window.setTimeout(() => { if (!running) void scan(); }, delay);}
 }
 function registerPages(root: ParentNode) {
