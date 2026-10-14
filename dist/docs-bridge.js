@@ -12,12 +12,14 @@
   // src/docs-bridge.ts
   var require_docs_bridge = __commonJS({
     "src/docs-bridge.ts"() {
-      window.addEventListener("ko-docs-init", (event) => {
+      var initialize = (event) => {
         const id = event.detail;
         if (typeof id === "string" && /^[a-p]{32}$/.test(id)) {
           window._docs_annotate_canvas_by_ext = id;
+          window.removeEventListener("ko-docs-init", initialize);
         }
-      });
+      };
+      window.addEventListener("ko-docs-init", initialize);
     }
   });
   require_docs_bridge();

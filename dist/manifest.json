@@ -8,6 +8,10 @@
     "storage",
     "offscreen"
   ],
+  "options_ui": {
+    "page": "about.html",
+    "open_in_tab": true
+  },
   "background": {
     "service_worker": "background.js"
   },
