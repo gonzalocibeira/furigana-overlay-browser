@@ -93,7 +93,17 @@ Open the optional **Extra-space reading view** for a separate, selectable panel 
 
 The panel follows the active page after scrolling or editing settles, keeping the current text visible while an update waits. Unchanged document redraws preserve your selection, reading position, and open definition. Continue editing in Docs; click **Close** on the panel to return to overlay readings. The setting is saved across your Google Docs documents.
 
-**Click a word for its meaning.** The panel shows English and Japanese definitions, the reading, and the dictionary form for inflected words. Words can also be focused with Tab and opened with Enter or Space; press Escape to dismiss the definition. Definitions come from the English and Japanese editions of Wiktionary and require an internet connection. Only the clicked word's dictionary form is sent for lookup. Each language shows its own unavailable or missing-entry message when necessary; source links let you open the full entry.
+### Look up a word
+
+Click a word in the Docs reading panel to see its reading and definitions in English and Japanese. For inflected words, the card also shows the dictionary form used for lookup.
+
+![Google Docs beside the reading panel, with 海賊 selected and its reading かいぞく, English and Japanese definitions, and Wiktionary source links visible](docs/screenshots/google-docs-dictionary-live.png)
+
+Here, selecting **海賊** opens its reading **かいぞく** and the meaning **pirate**, with definitions in both languages below the reading text. The original Google Doc stays visible beside the panel. Follow either Wiktionary source link to read the full entry.
+
+Definitions come from the English and Japanese editions of Wiktionary and require an internet connection. Only the selected word's dictionary form is sent for lookup; furigana readings run on your device. Each language shows its own unavailable or missing-entry message when necessary.
+
+You can also focus a word with Tab and open it with Enter or Space. Press Escape or the definition card's **×** button to dismiss it and return to reading.
 
 These screenshots show real use on Japanese Wikipedia and in Google Docs. **Google Docs support is experimental**; compatibility can vary as Google's editor changes. The reading panel is text-only: tables and formatting may be simplified, and images are omitted.
 
