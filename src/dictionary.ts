@@ -4,7 +4,7 @@ async function page(language:DefinitionLanguage,word:string):Promise<DictionaryP
   try {
     const url=new URL(`https://${language}.wiktionary.org/w/api.php`);
     url.search=new URLSearchParams({action:'parse',page:word,prop:'text',format:'json',formatversion:'2',redirects:'1',disableeditsection:'1'}).toString();
-    const response=await fetch(url,{credentials:'omit',referrerPolicy:'no-referrer',signal:AbortSignal.timeout(8000)});
+    const response=await fetch(url,{credentials:'omit',referrerPolicy:'no-referrer',redirect:'error',signal:AbortSignal.timeout(8000)});
     if(!response.ok)return {status:response.status===404?'missing':'error'};
     // Keep oversized entries from consuming unbounded memory in the service worker.
     const reader=response.body?.getReader();if(!reader)return {status:'error'};

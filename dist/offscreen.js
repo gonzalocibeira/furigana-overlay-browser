@@ -23,7 +23,8 @@
         for (const { resolve } of pending.values()) resolve({ error: "Tokenizer worker failed" });
         pending.clear();
       };
-      chrome.runtime.onMessage.addListener((message, _sender, respond) => {
+      chrome.runtime.onMessage.addListener((message, sender, respond) => {
+        if (sender.id !== chrome.runtime.id || sender.tab || sender.url !== chrome.runtime.getURL("background.js")) return;
         if (message?.type === "worker-release") {
           worker.postMessage(message);
           return;

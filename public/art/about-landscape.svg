@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 320" fill="none">
+  <defs>
+    <pattern id="grain" width="9" height="11" patternUnits="userSpaceOnUse"><path d="M1 2h1M6 8h2M3 10h1" stroke="#624d35" stroke-opacity=".1" stroke-width=".6"/></pattern>
+    <pattern id="water" width="110" height="16" patternUnits="userSpaceOnUse"><path d="M0 4h36m8 0h13m20 7h33M12 14h40" stroke="#234e64" stroke-opacity=".28" stroke-width="1"/></pattern>
+    <g id="flower"><path d="M0-2C-14-22-25-5-9 3C-28 9-13 25-3 10C-1 30 17 19 9 7C30 11 25-10 10-5C14-25-7-24 0-2Z" fill="#ad4a37"/><circle cx="1" cy="3" r="3" fill="#f4ecd8"/><path d="M1 0v6m-3-3h6" stroke="#263d46" stroke-width="1"/></g>
+  </defs>
+  <path d="M580 203C650 174 681 181 722 192C778 156 830 165 874 187C952 146 1016 159 1100 172V320H580Z" fill="#234e64" opacity=".07"/>
+  <circle cx="884" cy="106" r="64" fill="#ad4a37" opacity=".86"/>
+  <path d="M680 251L854 91L1011 251Z" fill="#c8c6b2"/>
+  <path d="M680 251L854 91L1009 251L906 213L864 156L835 170L806 154L768 211Z" fill="#234e64" opacity=".58"/>
+  <path d="M800 142L854 91L901 139L880 135L868 146L853 126L835 146L820 137Z" fill="#f7efdc"/>
+  <path d="M846 139L799 211M860 153L882 194M889 162L932 216M805 176L766 224M843 176L824 214M879 208L892 232" stroke="#f4ecd8" stroke-opacity=".5" stroke-width="2"/>
+  <path d="M560 262C648 237 658 258 709 244C770 226 788 252 842 242C914 226 975 249 1100 218V320H560Z" fill="#234e64" opacity=".2"/>
+  <path d="M583 279C657 265 712 277 781 260C852 244 913 271 995 254C1044 243 1066 249 1100 244V320H583Z" fill="url(#water)"/>
+  <path d="M989 260C1009 250 1022 251 1037 248C1052 245 1064 238 1071 234L1100 231V274Z" fill="#234e64" opacity=".7"/>
+  <path d="M1105 21C1062 34 1035 31 998 53C976 67 957 65 933 80M1039 37L1022 5M998 53L990 29M1065 29L1080 62" stroke="#263d46" stroke-width="5" stroke-linecap="round"/>
+  <path d="M1031 40L1049 60M975 65L969 44M1063 30L1054 11" stroke="#263d46" stroke-width="2"/>
+  <use href="#flower" transform="translate(1022 10) scale(.8)"/><use href="#flower" transform="translate(995 38) scale(.6)"/><use href="#flower" transform="translate(974 59) scale(.75)"/><use href="#flower" transform="translate(1046 58) scale(.7)"/><use href="#flower" transform="translate(1082 62) scale(.9)"/><use href="#flower" transform="translate(1068 24) scale(.8)"/>
+  <path d="M957 122q13-5 11 8q-11 2-11-8M1046 155q11-9 13 3q-9 7-13-3M993 208q12-5 10 7q-10 3-10-7" fill="#ad4a37" opacity=".6"/>
+  <path d="M734 291q24 12 48 0Z" fill="#234e64" opacity=".8"/><path d="M760 291v-23m-1 8 12 7" stroke="#234e64" stroke-width="1.5"/>
+  <path d="M515 303h104m9 0h36m236-14h66m-131 20h92" stroke="#234e64" stroke-opacity=".3"/>
+  <path fill="url(#grain)" d="M0 0h1100v320H0z"/>
+</svg>

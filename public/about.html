@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>About Kō — Japanese Reading Companion</title>
+<style>
+body{margin:0;color:var(--ink,#242b2d);font:16px/1.75 var(--body,system-ui);background-color:#dfd0ae;background-image:radial-gradient(ellipse at 15% 10%,#faf0d9a6,transparent 50%),repeating-linear-gradient(96deg,#72583205 0 1px,transparent 1px 7px),repeating-linear-gradient(5deg,#72583206 0 1px,transparent 1px 11px)}
+main{max-width:1120px;margin:40px auto;padding:0 28px 32px}
+.hero{border:1px solid #263d46;background:var(--paper);box-shadow:5px 6px 0 #263d4626;position:relative}
+.hero:before{content:"";position:absolute;inset:7px;border:1px solid #263d4640;pointer-events:none;z-index:1}
+.landscape{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;pointer-events:none}
+header{position:relative;min-height:280px;padding:42px 36px;background:linear-gradient(100deg,#f7efdc,#ede0bf);overflow:hidden}
+.header-content{position:relative;z-index:1;max-width:65%}.brand{display:flex;align-items:flex-start;gap:22px}
+header .seal{width:70px;height:70px;flex:none}header .identity{min-width:0;flex:1}
+.kicker{font:11px/1.5 var(--mono);letter-spacing:2px;text-transform:uppercase;color:var(--seal);margin:0 0 20px}
+h1{font:600 48px/1.1 Georgia,"Yu Mincho",serif;margin:0;letter-spacing:-1.5px;color:#163c4d}
+.subtitle{margin:7px 0 0;line-height:1.4}.version{font:11px/1.5 var(--mono);color:var(--muted);margin:12px 0 0;letter-spacing:.8px}
+
+.sections{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:30px}
+section{position:relative;background-color:#f7efdc;background-image:repeating-linear-gradient(3deg,#72583204 0 1px,transparent 1px 9px);border:1px solid #263d4690;padding:28px 30px 30px;box-shadow:3px 4px 0 #263d4612}
+section:before{content:"";position:absolute;width:42px;height:3px;top:-2px;left:30px;background:var(--seal)}
+h2{display:flex;gap:12px;align-items:center;font:600 23px/1.3 Georgia,serif;color:#163c4d;margin:0 0 20px}
+.chapter{display:inline-flex;align-items:center;justify-content:center;width:30px;height:34px;flex:none;border:1px solid #9f3e2d70;color:var(--seal);font:19px/1 "Yu Mincho",serif;transform:rotate(-2deg)}
+p{margin:0 0 14px}p:last-child{margin-bottom:0}
+a{color:var(--accent);text-decoration-thickness:1px;text-underline-offset:4px;overflow-wrap:anywhere}a:hover{color:var(--seal)}
+ul{list-style:none;margin:0;padding:0}li+li{border-top:1px solid #263d4630;margin-top:16px;padding-top:16px}
+.policy-links{display:flex;flex-wrap:wrap;gap:12px 20px;margin-top:20px}
+footer{display:flex;align-items:center;justify-content:space-between;gap:24px;margin-top:30px;padding:22px 0 0;border-top:3px double #263d4680;color:var(--muted);font-size:12px;line-height:1.65}
+footer p{max-width:660px;margin:0}.colophon{flex:none;border:1px solid var(--seal);padding:5px 7px;color:var(--seal);font:17px/1.2 "Yu Mincho",serif;writing-mode:vertical-rl;letter-spacing:3px;transform:rotate(3deg)}
+@media(max-width:700px){main{margin:24px auto;padding:0 20px 24px}.sections{grid-template-columns:1fr;gap:20px;margin-top:24px}header{padding:30px 26px;min-height:260px}.header-content{max-width:80%}.brand{gap:16px}.landscape{opacity:.5;object-position:65% center}h1{font-size:40px}section{padding:24px 26px}section:before{left:26px}}
+@media(max-width:440px){main{padding:0 14px 24px;margin-top:16px}header{padding:28px 20px 100px}.header-content{max-width:100%}.brand{gap:13px}.landscape{opacity:.32;object-position:right bottom}header .seal{width:48px;height:48px}h1{font-size:34px}.kicker{font-size:10px;letter-spacing:1.5px}.subtitle{font-size:13px}h2{font-size:22px}section{padding:24px}.hero:before{inset:5px}}
+@media print{body{background:white}main{margin:0;max-width:none}.hero,section{box-shadow:none}.sections{display:block}section{break-inside:avoid;margin-top:20px}.landscape{max-height:200px}footer{break-inside:avoid}}
+</style>
+</head>
+<body>
+<main>
+<div class="hero">
+<header>
+<img class="landscape" src="art/about-landscape.svg" alt="" aria-hidden="true" width="1100" height="320">
+<div class="header-content"><p class="kicker">A Japanese reading companion</p><div class="brand"><img class="seal" src="icons/logo.svg" alt="Kō seal — 考" width="70" height="70"><div class="identity"><h1>About Kō</h1><p class="subtitle">A little help, wherever you read.</p><p class="version" id="version"></p></div></div></div>
+</header>
+</div>
+<div class="sections">
+<section aria-labelledby="project-heading">
+<h2 id="project-heading"><span class="chapter" lang="ja" aria-hidden="true">一</span>About the project</h2>
+<p>Kō helps you read Japanese on webpages and in Google Docs. It adds furigana above kanji, offers a roomier reading panel, and remembers your preferred pronunciations while keeping the original text and formatting intact.</p>
+<p>Built by Gonzalo Cibeira to make reading Japanese in Google Docs easier, then extended to help wherever you browse. The project is open source under the MIT license.</p>
+</section>
+<section aria-labelledby="settings-heading">
+<h2 id="settings-heading"><span class="chapter" lang="ja" aria-hidden="true">二</span>Reading settings</h2>
+<p>Open Kō from Chrome’s extensions toolbar to pause automatic readings, choose your reading appearance, enable the reading panel, or manage local pronunciation corrections. Site settings apply to the webpage you have open.</p>
+</section>
+<section aria-labelledby="privacy-heading">
+<h2 id="privacy-heading"><span class="chapter" lang="ja" aria-hidden="true">三</span>Privacy</h2>
+<p>Furigana runs on your device with bundled dictionaries. Settings and corrections are stored locally. Opening a word definition sends that word’s dictionary form to English and Japanese Wiktionary, which also receives your IP address. Surrounding sentences and full documents are not uploaded. Kō has no analytics, advertising, or extension account.</p>
+<p class="policy-links"><a href="https://github.com/gonzalocibeira/ko-japanese-reading-companion/blob/master/docs/privacy-policy.md" target="_blank" rel="noopener noreferrer">Read the privacy policy ↗</a><a href="privacy.html" target="_blank" rel="noopener noreferrer">Read offline</a></p>
+</section>
+<section aria-labelledby="links-heading">
+<h2 id="links-heading"><span class="chapter" lang="ja" aria-hidden="true">四</span>Project and contact</h2>
+<ul>
+<li><a href="https://github.com/gonzalocibeira" target="_blank" rel="noopener noreferrer">Gonzalo Cibeira on GitHub ↗</a></li>
+<li><a href="https://github.com/gonzalocibeira/ko-japanese-reading-companion" target="_blank" rel="noopener noreferrer">Source code and project README ↗</a></li>
+<li><a href="https://github.com/gonzalocibeira/ko-japanese-reading-companion/issues" target="_blank" rel="noopener noreferrer">Report an issue or suggest an improvement ↗</a></li>
+</ul>
+</section>
+</div>
+<footer><p>Made by Gonzalo Cibeira. Kō is an independent project and is not affiliated with Google or Wikimedia.</p><span class="colophon" lang="ja" aria-hidden="true">考</span></footer>
+</main>
+<script src="about.js"></script>
+</body>
+</html>

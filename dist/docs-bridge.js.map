@@ -1,7 +1,7 @@
 {
   "version": 3,
   "sources": ["../src/docs-bridge.ts"],
-  "sourcesContent": ["// Keep page-world code minimal. The build replaces this with this installation's ID\n// supplied by the isolated content script; no privileged APIs enter the page world.\nwindow.addEventListener('ko-docs-init', (event) => {\n  const id = (event as CustomEvent).detail;\n  if (typeof id === 'string' && /^[a-p]{32}$/.test(id)) {\n    (window as unknown as Record<string, unknown>)._docs_annotate_canvas_by_ext = id;\n  }\n});\n"],
-  "mappings": ";;;;;;;;;;;;AAAA;AAAA;AAEA,aAAO,iBAAiB,gBAAgB,CAAC,UAAU;AACjD,cAAM,KAAM,MAAsB;AAClC,YAAI,OAAO,OAAO,YAAY,cAAc,KAAK,EAAE,GAAG;AACpD,UAAC,OAA8C,+BAA+B;AAAA,QAChF;AAAA,MACF,CAAC;AAAA;AAAA;",
+  "sourcesContent": ["// The isolated script supplies this installation's public ID, not document text\n// or extension capabilities. Page scripts can spoof this event, so never treat it\n// as an authenticated channel or accept commands/data through it.\nconst initialize = (event: Event) => {\n  const id = (event as CustomEvent).detail;\n  if (typeof id === 'string' && /^[a-p]{32}$/.test(id)) {\n    (window as unknown as Record<string, unknown>)._docs_annotate_canvas_by_ext = id;\n    window.removeEventListener('ko-docs-init', initialize);\n  }\n};\nwindow.addEventListener('ko-docs-init', initialize);\n"],
+  "mappings": ";;;;;;;;;;;;AAAA;AAAA;AAGA,UAAM,aAAa,CAAC,UAAiB;AACnC,cAAM,KAAM,MAAsB;AAClC,YAAI,OAAO,OAAO,YAAY,cAAc,KAAK,EAAE,GAAG;AACpD,UAAC,OAA8C,+BAA+B;AAC9E,iBAAO,oBAAoB,gBAAgB,UAAU;AAAA,QACvD;AAAA,MACF;AACA,aAAO,iBAAiB,gBAAgB,UAAU;AAAA;AAAA;",
   "names": []
 }
