@@ -32,6 +32,37 @@ async function annotations(page:Page) {
   } finally {await session.detach();}
 }
 async function settings(values:Record<string,unknown>) {const worker=context.serviceWorkers()[0];await worker.evaluate(values=>chrome.storage.local.set(values),values);}
+test('vocabulary noun readings reach Docs overlays and word metadata without changing names or saved corrections',async()=>{
+  await settings({docsReadingView:{enabled:false,spacing:2.8},readingOverrides:{}});
+  const page=await context.newPage();
+  try {
+    const lines=['出口 = salida','出口','出口太郎','出口はどこですか。'];
+    await page.route('https://docs.google.com/document/d/vocabulary/edit',route=>route.fulfill({contentType:'text/html',body:`<!doctype html><meta charset="utf-8"><style>body{margin:0}.kix-appview-editor{position:absolute;top:100px;width:900px;height:600px}</style><div class="kix-appview-editor"><svg width="900" height="600">${lines.map((text,i)=>`<g data-font-css="24px system-ui"><rect x="40" y="${60+i*60}" width="${text.length*24}" height="28" aria-label="${text}" fill="transparent"/><text x="40" y="${83+i*60}" style="font:24px system-ui">${text}</text></g>`).join('')}</svg></div>`}));
+    await page.goto('https://docs.google.com/document/d/vocabulary/edit');
+    const source=await page.locator('.kix-appview-editor').innerHTML();
+    await expect.poll(async()=> (await annotations(page)).filter(a=>a.text==='でぐち').length,{timeout:30000}).toBe(3);
+    expect((await annotations(page)).filter(a=>a.text==='いでぐち')).toHaveLength(1);
+    await settings({docsReadingView:{enabled:true,spacing:2.8}});
+    const exitWords=`function(){return Array.from(this.querySelectorAll('[data-surface="出口"]'),el=>({reading:el.dataset.reading,ruby:el.querySelector('rt')?.textContent}))}`;
+    await expect.poll(()=>readerEval(page,exitWords)).toEqual([
+      {reading:'でぐち',ruby:'でぐち'},{reading:'でぐち',ruby:'でぐち'},
+      {reading:'いでぐち',ruby:'いでぐち'},{reading:'でぐち',ruby:'でぐち'}
+    ]);
+    // The isolated 出口 above has already been cached. Splitting the name at
+    // a correction must still keep its surname reading for the same fragment.
+    await settings({readingOverrides:{'太郎':'たろ'}});
+    await expect.poll(async()=> (await readerEval(page,readerSnapshot))?.readings).toContain('たろ');
+    expect((await readerEval(page,readerSnapshot)).readings.filter((r:string)=>r==='いでぐち')).toEqual(['いでぐち']);
+    expect((await readerEval(page,readerSnapshot)).readings.filter((r:string)=>r==='でぐち')).toHaveLength(3);
+    await settings({readingOverrides:{'出口':'いでぐち'}});
+    await expect.poll(async()=> (await readerEval(page,readerSnapshot))?.readings.filter((r:string)=>r==='でぐち')).toEqual([]);
+    expect((await readerEval(page,readerSnapshot)).readings.filter((r:string)=>r==='いでぐち')).toHaveLength(4);
+    expect(await page.locator('.kix-appview-editor').innerHTML()).toBe(source);
+  } finally {
+    await settings({docsReadingView:{enabled:false,spacing:2.8},readingOverrides:{}});
+    await page.close();
+  }
+});
 test('automatic offline readings preserve source, react to changes, and disable cleanly',async()=>{
   const page=await context.newPage(); const remote:string[]=[];
   page.on('request',request=>{if(!request.url().startsWith(base)&&!request.url().startsWith('chrome-extension:'))remote.push(request.url());});

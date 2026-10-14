@@ -111,11 +111,11 @@
   // src/preferences.ts
   function readWithOverrides(text, overrides, read) {
     const words = Object.keys(overrides).sort((a, b) => b.length - a.length);
-    if (!words.length) return read(text);
+    if (!words.length) return read(text, 0);
     const out = [];
     let cursor = 0;
     function gap(end) {
-      if (end > cursor) for (const part of read(text.slice(cursor, end))) out.push({ ...part, start: part.start + cursor, end: part.end + cursor });
+      if (end > cursor) for (const part of read(text.slice(cursor, end), cursor)) out.push({ ...part, start: part.start + cursor, end: part.end + cursor });
     }
     for (let i = 0; i < text.length; ) {
       const word = words.find((word2) => text.startsWith(word2, i));
@@ -4616,12 +4616,62 @@
     }
   });
 
+  // src/vocabulary.ts
+  function vocabularyHeadwords(text) {
+    const out = [];
+    for (const line of text.matchAll(/[^\r\n]+/gu)) {
+      const match = line[0].trim().match(/^([\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}々〆ー]+)(?:[^\S\r\n]*[=＝:：][^\S\r\n]*([^\r\n]+))?$/u);
+      if (!match || match[2] && (japanese.test(match[2]) || !new RegExp("\\p{Script=Latin}", "u").test(match[2]))) continue;
+      const start = line.index + line[0].indexOf(match[1]);
+      out.push({ start, end: start + match[1].length });
+    }
+    return out;
+  }
+  function commonNoun(tokenizer, token) {
+    const lattice = tokenizer.getLattice(token.surface_form);
+    tokenizer.viterbi_searcher.forward(lattice);
+    const eos = lattice.nodes_end_at[lattice.nodes_end_at.length - 1][0];
+    let best, bestCost = Infinity;
+    for (const nodes of lattice.nodes_end_at) for (const node of nodes ?? []) {
+      if (node.type !== "KNOWN" || node.start_pos !== 1 || node.surface_form !== token.surface_form) continue;
+      const features = tokenizer.token_info_dictionary.getFeatures(node.name).split(",");
+      if (features[1] !== "\u540D\u8A5E" || features[2] !== "\u4E00\u822C" || !features[8] || features[8] === "*") continue;
+      const cost = node.shortest_cost + tokenizer.viterbi_searcher.connection_costs.get(node.right_id, eos.left_id);
+      if (cost < bestCost) {
+        bestCost = cost;
+        best = tokenizer.formatter.formatEntry(Number(node.name), token.word_position, node.type, features);
+      }
+    }
+    return best;
+  }
+  function tokenizeVocabulary(tokenizer, text, headwords = vocabularyHeadwords(text), sourceOffset = 0) {
+    const tokens = tokenizer.tokenize(text);
+    if (!headwords.length) return tokens;
+    let offset = 0;
+    return tokens.map((token) => {
+      const start = text.indexOf(token.surface_form, offset);
+      if (start < 0) return token;
+      offset = start + token.surface_form.length;
+      if (token.pos !== "\u540D\u8A5E" || token.pos_detail_1 !== "\u56FA\u6709\u540D\u8A5E") return token;
+      if (!headwords.some((word) => word.start === sourceOffset + start && word.end === sourceOffset + offset)) return token;
+      return commonNoun(tokenizer, token) ?? token;
+    });
+  }
+  var japanese;
+  var init_vocabulary = __esm({
+    "src/vocabulary.ts"() {
+      "use strict";
+      japanese = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}々〆]/u;
+    }
+  });
+
   // src/tokenizer.ts
   var require_tokenizer = __commonJS({
     "src/tokenizer.ts"() {
       init_preferences();
       var import_kuromoji = __toESM(require_kuromoji());
       init_shared();
+      init_vocabulary();
       var caches = /* @__PURE__ */ new Map();
       var ready = new Promise((resolve, reject) => {
         import_kuromoji.default.builder({ dicPath: new URL("dict/", self.location.href).href }).build((error, tokenizer) => error ? reject(error) : resolve(tokenizer));
@@ -4655,7 +4705,8 @@
           let started = performance.now();
           for (const text of texts) {
             if (cancelled.has(id)) return;
-            const tokens = data.includeWords ? tokenizer.tokenize(text) : void 0;
+            const headwords = vocabularyHeadwords(text);
+            const tokens = data.includeWords ? tokenizeVocabulary(tokenizer, text, headwords) : void 0;
             if (tokens) {
               let offset = 0;
               const entries = [];
@@ -4667,20 +4718,21 @@
               }
               words.push(entries);
             }
-            const result = (text2) => {
-              const hit = cache.get(text2);
+            const result = (fragment, sourceOffset) => {
+              const cacheKey = JSON.stringify([text, sourceOffset, fragment]);
+              const hit = cache.get(cacheKey);
               if (hit) return hit;
               const out = [];
               let offset = 0;
-              for (const token of text2 === texts[results.length] && tokens ? tokens : tokenizer.tokenize(text2)) {
-                const start = text2.indexOf(token.surface_form, offset);
+              for (const token of fragment === text && tokens ? tokens : tokenizeVocabulary(tokenizer, fragment, headwords, sourceOffset)) {
+                const start = fragment.indexOf(token.surface_form, offset);
                 if (start < 0) continue;
                 offset = start + token.surface_form.length;
                 const parts = align(token.surface_form, token.reading ?? "");
                 if (!parts.length && /[\p{Script=Han}々]/u.test(token.surface_form)) out.push({ start, end: offset, reading: "" });
                 for (const part of parts) out.push({ start: start + part.start, end: start + part.end, reading: part.reading });
               }
-              cache.set(text2, out);
+              cache.set(cacheKey, out);
               return out;
             };
             results.push(readWithOverrides(text, data.overrides ?? {}, result));

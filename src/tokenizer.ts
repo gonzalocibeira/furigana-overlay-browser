@@ -1,6 +1,7 @@
 import {readWithOverrides} from './preferences';
 import kuromoji from 'kuromoji';
 import { align, hiragana, ReadingCache, type Reading, type Word } from './shared';
+import {tokenizeVocabulary,vocabularyHeadwords} from './vocabulary';
 const caches = new Map<string, ReadingCache>();
 const ready = new Promise<kuromoji.Tokenizer<kuromoji.IpadicFeatures>>((resolve, reject) => {
   kuromoji.builder({dicPath: new URL('dict/', self.location.href).href}).build((error, tokenizer) => error ? reject(error) : resolve(tokenizer));
@@ -24,7 +25,8 @@ async function run(data: any) {
     let started=performance.now();
     for(const text of texts as string[]) {
       if(cancelled.has(id))return;
-      const tokens=data.includeWords?tokenizer.tokenize(text):undefined;
+      const headwords=vocabularyHeadwords(text);
+      const tokens=data.includeWords?tokenizeVocabulary(tokenizer,text,headwords):undefined;
       if(tokens) {
         let offset=0;const entries:Word[]=[];
         for(const token of tokens) {
@@ -34,20 +36,23 @@ async function run(data: any) {
         }
         words.push(entries);
       }
-      const result=(text:string)=>{
-      const hit = cache!.get(text); if (hit) return hit;
+      const result=(fragment:string,sourceOffset:number)=>{
+      // Include source context: an identical fragment in a name must not reuse
+      // the common-noun reading cached for an isolated vocabulary entry.
+      const cacheKey=JSON.stringify([text,sourceOffset,fragment]);
+      const hit = cache!.get(cacheKey); if (hit) return hit;
       const out: Reading[] = [];
       let offset = 0;
-      for (const token of (text===texts[results.length] && tokens?tokens:tokenizer.tokenize(text))) {
+      for (const token of (fragment===text && tokens?tokens:tokenizeVocabulary(tokenizer,fragment,headwords,sourceOffset))) {
         // Locate sequential surfaces rather than relying on code-point positions.
-        const start = text.indexOf(token.surface_form, offset);
+        const start = fragment.indexOf(token.surface_form, offset);
         if (start < 0) continue;
         offset = start + token.surface_form.length;
         const parts=align(token.surface_form, token.reading ?? '');
         if (!parts.length && /[\p{Script=Han}々]/u.test(token.surface_form)) out.push({start,end:offset,reading:''});
         for (const part of parts) out.push({start:start + part.start, end:start + part.end, reading:part.reading});
       }
-      cache!.set(text, out); return out;
+      cache!.set(cacheKey, out); return out;
       };
       results.push(readWithOverrides(text,data.overrides ?? {},result));
       // Each individual tokenize call is bounded to 2,000 characters. Yield between texts

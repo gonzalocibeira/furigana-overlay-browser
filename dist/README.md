@@ -5,11 +5,13 @@
 <h1 align="center">Furigana Overlay Browser</h1>
 <p align="center"><strong>A little help above the kanji.</strong></p>
 <p align="center">Automatic Japanese readings for webpages and Google Docs.<br>Processed on your device, with the dictionary included.</p>
+<p align="center">Version <strong>0.4.0</strong> · 14 October 2026</p>
 <p align="center">
   <a href="#install-in-chrome">Install in Chrome</a> ·
   <a href="#see-it-in-action">See it in action</a> ·
   <a href="#make-it-yours">Make it yours</a> ·
-  <a href="#help-and-compatibility">Get help</a>
+  <a href="#help-and-compatibility">Get help</a> ·
+  <a href="#release-notes">Release notes</a>
 </p>
 
 ![Furigana above Japanese text on Wikipedia, with the extension menu showing automatic readings enabled](docs/screenshots/webpage-live.png)
@@ -20,6 +22,17 @@
 | --- | --- | --- |
 | Furigana appears automatically on visible Japanese text. | Original webpage text and Google Docs formatting stay unchanged. | Pause a site, adjust the appearance, or save your own readings. |
 | **Offline processing** with a bundled dictionary. | **Google Docs support** with an optional extra-space reading panel. | **No account or API key** needed. Settings and corrections stay on this device. |
+
+## Release notes
+
+### 0.4.0 · 14 October 2026
+
+- **English and Japanese word definitions.** Click a word in the Docs reading panel to see its meaning, reading, and dictionary form, with Wiktionary source links. Kana-only words and keyboard navigation are supported. Definitions need an internet connection; only the clicked word's dictionary form is sent. Furigana stays offline.
+- **A steadier Docs reading panel.** Routine updates wait for at least 400 ms of quiet and keep the current text visible until the next view is ready. Unchanged redraws preserve selection, keyboard focus, scroll position, and open definitions.
+- **Better vocabulary readings.** Isolated words and translation lines such as `出口 = salida` prefer an exact common-noun dictionary entry over a proper-name entry, giving `でぐち` instead of `いでぐち`. Sentence context and saved corrections are preserved. Standalone names can still need a local correction.
+- **27 regression tests** cover the extension, definitions, panel refreshes, vocabulary readings, and existing behavior. The ready-to-load extension is rebuilt with version 0.4.0.
+
+Read the [full release notes](docs/release-notes.md) for details and update instructions. After updating, reload the extension and your open tabs.
 
 ## Install in Chrome
 
@@ -93,6 +106,8 @@ These screenshots show real use on Japanese Wikipedia and in Google Docs. **Goog
 | **Reading appearance** | Choose Small, Default, Large, or Extra large readings, with page colors or high contrast. Preferences are saved per hostname. |
 | **Local reading corrections** | Save, edit, or remove preferred readings for names and words. Enter hiragana or katakana; readings display in hiragana. Up to 200 corrections apply across sites. |
 | **On this page** | Check reading status, including tight spacing or unavailable Docs text. |
+
+For isolated vocabulary and translation lines such as `出口 = salida`, readings prefer a matching common-noun dictionary entry when the tokenizer selects a proper name. Saved corrections take priority; add one when you intend a standalone surname or another preferred reading.
 
 Readings shrink or are omitted when space is tight to preserve the original line spacing. Try a smaller reading size or the extra-space Docs panel when you need more room.
 
@@ -176,7 +191,7 @@ npm test
 
 `npm run build` regenerates the included `dist/` folder. Development dependency installation requires internet access; the installed extension works without an external processing service.
 
-The test suite has **22 tests**, including automatic annotations, unchanged source/layout, a 100,000-node webpage, a 100-page Docs fixture, cancellation, IME handling, settings, corrections, the reading panel, debounced refreshes, and bilingual word definitions. Browser integration tests use a temporary profile and localhost server. They default to Brave's standard macOS executable; set `CHROMIUM_PATH` to an extension-capable Chromium executable elsewhere. Chrome distributions that disable command-line extension loading cannot run these integration tests. Your normal browser profile and Google account are not used.
+The test suite has **27 tests**, including automatic annotations, unchanged source/layout, a 100,000-node webpage, a 100-page Docs fixture, cancellation, IME handling, settings, corrections, vocabulary/name disambiguation, the reading panel, debounced refreshes, and bilingual word definitions. Browser integration tests use a temporary profile and localhost server. They default to Brave's standard macOS executable; set `CHROMIUM_PATH` to an extension-capable Chromium executable elsewhere. Chrome distributions that disable command-line extension loading cannot run these integration tests. Your normal browser profile and Google account are not used.
 
 The README uses real-use screenshots supplied by the project owner. Earlier fixture captures are also preserved in [`docs/screenshots/`](docs/screenshots/). Regenerated browser captures are written to `test-results/` during tests.
 
