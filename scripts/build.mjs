@@ -3,7 +3,9 @@ import {buildIcons} from './icons.mjs';
 import {mkdir,cp,rm,readFile,writeFile} from 'node:fs/promises';
 await rm('dist',{recursive:true,force:true});
 await mkdir('dist',{recursive:true});
-await build({entryPoints:['src/background.ts','src/content.ts','src/docs-bridge.ts','src/offscreen.ts','src/tokenizer.ts','src/popup.ts'],outdir:'dist',bundle:true,platform:'browser',target:'chrome116',format:'iife',sourcemap:true,alias:{path:'./src/path-shim.ts'}});
+// Embed the shared logo in the panel without exposing extension resources to pages.
+const panelLogo=await readFile('public/icons/logo.svg','utf8');
+await build({entryPoints:['src/background.ts','src/content.ts','src/docs-bridge.ts','src/offscreen.ts','src/tokenizer.ts','src/popup.ts'],outdir:'dist',bundle:true,platform:'browser',target:'chrome116',format:'iife',sourcemap:true,alias:{path:'./src/path-shim.ts'},define:{__KO_LOGO_SVG__:JSON.stringify(panelLogo)}});
 await cp('public','dist',{recursive:true});
 await buildIcons('dist/icons');
 await writeFile('dist/README.md',(await readFile('README.md','utf8')).replaceAll('public/icons/logo.svg','icons/logo.svg').replaceAll('](dist/','](').replaceAll('**`dist` folder**','**extension folder**'));
