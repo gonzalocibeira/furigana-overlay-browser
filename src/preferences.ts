@@ -22,13 +22,13 @@ export function validOverrides(value: unknown): Record<string,string> {
   return Object.fromEntries(entries);
 }
 // Prefer the longest correction at each position, including multi-token names.
-export function readWithOverrides(text:string,overrides:Record<string,string>,read:(text:string)=>Reading[]):Reading[] {
+export function readWithOverrides(text:string,overrides:Record<string,string>,read:(text:string,sourceOffset:number)=>Reading[]):Reading[] {
   const words=Object.keys(overrides).sort((a,b)=>b.length-a.length);
-  if(!words.length)return read(text);
+  if(!words.length)return read(text,0);
   const out:Reading[]=[];
   let cursor=0;
   function gap(end:number) {
-    if(end>cursor)for(const part of read(text.slice(cursor,end)))out.push({...part,start:part.start+cursor,end:part.end+cursor});
+    if(end>cursor)for(const part of read(text.slice(cursor,end),cursor))out.push({...part,start:part.start+cursor,end:part.end+cursor});
   }
   for(let i=0;i<text.length;) {
     const word=words.find(word=>text.startsWith(word,i));
