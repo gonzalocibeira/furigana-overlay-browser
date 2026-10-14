@@ -4,15 +4,18 @@ import {runInNewContext} from 'node:vm';
 test('cancelled queued jobs never reach the worker; active cancellation stays isolated by document',async()=>{
   let listener:Function=()=>{},uuid=0;
   const sent:any[]=[],pending=new Map<string,Function>();
+  const event={addListener:()=>{}};
   const chrome={
     runtime:{ContextType:{OFFSCREEN_DOCUMENT:'offscreen'},getContexts:async()=>[{}],
       onMessage:{addListener:(fn:Function)=>listener=fn},
+      onInstalled:event,onStartup:event,
       sendMessage:(message:any)=>{
         sent.push(message);
         if(message.type==='worker-job')return new Promise(resolve=>pending.set(message.jobId,resolve));
         if(message.type==='worker-cancel'){pending.get(message.jobId)?.({cancelled:true});pending.delete(message.jobId);}
         return Promise.resolve({ok:true});
-      }},tabs:{onRemoved:{addListener:()=>{}}}
+      }},tabs:{onRemoved:event,onActivated:event,onUpdated:event,query:async()=>[]},
+    storage:{onChanged:event}
   };
   runInNewContext(await readFile('dist/background.js','utf8'),{chrome,crypto:{randomUUID:()=>`job-${++uuid}`}});
   const sender=(id:string)=>({tab:{id:1},documentId:id,frameId:0});

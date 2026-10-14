@@ -1,5 +1,6 @@
 import {validOverrides} from './preferences';
 import './dictionary';
+import './action';
 let creating: Promise<void> | undefined;
 async function ensureOffscreen() {
   const contexts = await chrome.runtime.getContexts({contextTypes: [chrome.runtime.ContextType.OFFSCREEN_DOCUMENT]});

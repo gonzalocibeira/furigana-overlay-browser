@@ -143,11 +143,85 @@
     }
   });
 
+  // src/action-state.ts
+  function toolbarPresentation(url, preferences, page) {
+    if (preferences.enabled === false) return { state: "paused", title: "K\u014D \u2014 paused everywhere" };
+    let hostname = "";
+    try {
+      const parsed = new URL(url ?? "");
+      if (/^https?:$/.test(parsed.protocol)) hostname = parsed.hostname;
+    } catch {
+    }
+    if (hostname && Array.isArray(preferences.excluded) && preferences.excluded.includes(hostname)) return { state: "paused", title: `K\u014D \u2014 paused on ${hostname}` };
+    if (!hostname) return { state: "unavailable", title: "K\u014D \u2014 unavailable on this page" };
+    if (!page) return { state: "unavailable", title: "K\u014D \u2014 reload this tab to start readings" };
+    if (page.toolbarAvailability !== "ready") return { state: "unavailable", title: `K\u014D \u2014 ${page.message}` };
+    return { state: "active", title: `K\u014D \u2014 active on ${hostname}` };
+  }
+  var init_action_state = __esm({
+    "src/action-state.ts"() {
+      "use strict";
+    }
+  });
+
+  // src/action.ts
+  var require_action = __commonJS({
+    "src/action.ts"() {
+      "use strict";
+      init_action_state();
+      var revisions = /* @__PURE__ */ new Map();
+      async function refreshTab(tabId, navigating = false) {
+        const revision = /* @__PURE__ */ Symbol();
+        revisions.set(tabId, revision);
+        try {
+          const [tab, preferences] = await Promise.all([chrome.tabs.get(tabId), chrome.storage.local.get({ enabled: true, excluded: [] })]);
+          let page;
+          if (!navigating && toolbarPresentation(tab.url, preferences).state === "unavailable" && /^https?:/.test(tab.url ?? "")) {
+            try {
+              const response = await chrome.tabs.sendMessage(tabId, { type: "status" }, { frameId: 0 });
+              if (typeof response?.message === "string" && ["ready", "unavailable"].includes(response.toolbarAvailability)) page = response;
+            } catch {
+            }
+          }
+          if (revisions.get(tabId) !== revision) return;
+          const presentation = toolbarPresentation(tab.url, preferences, page);
+          const path = Object.fromEntries([16, 32, 48, 128].map((size) => [size, `icons/icon-${presentation.state}-${size}.png`]));
+          await Promise.all([chrome.action.setIcon({ tabId, path }), chrome.action.setTitle({ tabId, title: presentation.title })]);
+        } catch {
+        }
+      }
+      async function refreshAll() {
+        try {
+          await Promise.all((await chrome.tabs.query({})).flatMap((tab) => tab.id === void 0 ? [] : [refreshTab(tab.id)]));
+        } catch {
+        }
+      }
+      chrome.runtime.onMessage.addListener((message, sender, respond) => {
+        if (message?.type !== "toolbar-status-changed" || sender.frameId !== 0 || sender.tab?.id === void 0) return;
+        respond({ ok: true });
+        void refreshTab(sender.tab.id);
+      });
+      chrome.storage.onChanged.addListener((changes, area) => {
+        if (area === "local" && ("enabled" in changes || "excluded" in changes)) void refreshAll();
+      });
+      chrome.tabs.onActivated.addListener(({ tabId }) => void refreshTab(tabId));
+      chrome.tabs.onUpdated.addListener((tabId, changes, tab) => {
+        if (changes.status === "loading" || changes.url) void refreshTab(tabId, changes.status === "loading" || tab.status === "loading");
+        else if (changes.status === "complete") void refreshTab(tabId);
+      });
+      chrome.tabs.onRemoved.addListener((tabId) => revisions.delete(tabId));
+      chrome.runtime.onInstalled.addListener(() => void refreshAll());
+      chrome.runtime.onStartup.addListener(() => void refreshAll());
+      void refreshAll();
+    }
+  });
+
   // src/background.ts
   var require_background = __commonJS({
     "src/background.ts"() {
       init_preferences();
       var import_dictionary = __toESM(require_dictionary());
+      var import_action = __toESM(require_action());
       var creating;
       async function ensureOffscreen() {
         const contexts = await chrome.runtime.getContexts({ contextTypes: [chrome.runtime.ContextType.OFFSCREEN_DOCUMENT] });

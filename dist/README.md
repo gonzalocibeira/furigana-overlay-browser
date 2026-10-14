@@ -1,9 +1,9 @@
 <p align="center">
-  <img src="icons/logo.svg" alt="字 with じ furigana" width="88">
+  <img src="icons/logo.svg" alt="Kō · 考 — think" width="88">
 </p>
 
-<h1 align="center">Furigana Overlay Browser</h1>
-<p align="center"><strong>A little help above the kanji.</strong></p>
+<h1 align="center">Kō — Japanese Reading Companion</h1>
+<p align="center"><strong>Japanese reading companion.</strong></p>
 <p align="center">Automatic Japanese readings for webpages and Google Docs.<br>Furigana runs on your device. Optional word definitions use Wiktionary online.</p>
 <p align="center">Version <strong>0.5.0</strong> · 14 October 2026</p>
 <p align="center">
@@ -25,6 +25,13 @@
 
 ## Release notes
 
+### Current working build
+
+- **Kō — Japanese Reading Companion.** The new name and vermilion 考 seal share the same identity. The interface uses warm paper, ink, indigo, and vermilion inspired by ukiyo-e prints.
+
+- **Brutalist interface.** Square controls, bold headings, ink borders, and an ukiyo-e-inspired palette across the popup, reading panel, definitions, and corrections.
+- **Per-tab 考 icon.** See whether readings are active, paused, or unavailable without opening the menu. Hover over the icon for details.
+
 ### 0.5.0 · 14 October 2026
 
 - **Reading view on webpages and Google Docs.** Enable the panel per website. It follows visible text after scrolling settles, including wrapped webpage paragraphs and kana-only words.
@@ -38,21 +45,21 @@ Read the [full release notes](docs/release-notes.md) for details and update inst
 
 **Download → Extract → Load `dist` → Start reading.** No Node.js, npm, or build step needed.
 
-The ready-to-load **Furigana Overlay Browser** extension is included in [`dist/`](). It is distributed through GitHub, not the Chrome Web Store.
+The ready-to-load **Kō — Japanese Reading Companion** extension is included in [`dist/`](). It is distributed through GitHub, not the Chrome Web Store.
 
-1. **Download this repository.** Click **Code → Download ZIP** at the top of the GitHub page. For a private repository, sign in with an account that has access.
-2. **Extract and keep the folder.** Put it somewhere permanent, such as `Documents/Furigana`.
+1. **Download [this repository](https://github.com/gonzalocibeira/ko-japanese-reading-companion).** Click **Code → Download ZIP** at the top of the GitHub page. For a private repository, sign in with an account that has access.
+2. **Extract and keep the folder.** Put it somewhere permanent, such as `Documents/Ko`.
 3. **Open Chrome's extensions page.** Enter `chrome://extensions` in the address bar and turn on **Developer mode**.
 4. **Load the extension.** Click **Load unpacked** and select the **extension folder** inside the extracted repository. It contains `manifest.json`.
 5. **Reload your tabs and read.** Furigana starts automatically. The first page may take a moment while the bundled reading dictionary loads.
 
-**Tip:** Pin **Furigana Overlay Browser** from Chrome's puzzle-piece **Extensions** menu. Look for **字** with **じ** above it.
+**Tip:** Pin **Kō — Japanese Reading Companion** from Chrome's puzzle-piece **Extensions** menu. Look for the warm-paper **考** (think) on a vermilion seal.
 
 <details>
 <summary><strong>Which folder should I select?</strong></summary>
 
 ```text
-furigana-overlay-browser-<branch>/
+ko-japanese-reading-companion-<branch>/
 ├── README.md
 ├── src/
 └── dist/                  ← Select this folder in “Load unpacked”
@@ -70,6 +77,24 @@ See [Chrome's official instructions for loading unpacked extensions](https://dev
 </details>
 
 ## See it in action
+
+### New interface and toolbar status
+
+The popup and reading panel use square controls, ink borders, warm paper surfaces, indigo, and vermilion accents. All reading settings, corrections, and backups remain available in the expandable sections.
+
+![The redesigned brutalist extension popup with indigo active status and square controls](docs/screenshots/popup.png)
+
+| Toolbar icon | Meaning |
+| --- | --- |
+| **Vermilion 考** | Readings are enabled and available on this tab, even with no visible kanji. |
+| **Sand-colored 考 with pause bars** | Readings are paused globally or for this hostname. |
+| **Outlined 考 with a slash** | The page is unavailable, processing failed, or the tab needs a reload. Hover over the icon for the reason. |
+
+Scrolling, typing, and background-tab suspension do not change an otherwise active icon. Click any icon state to open the menu.
+
+![The redesigned reading panel beside a Google Docs browser fixture](docs/screenshots/docs-reading-view.png)
+
+These new screenshots use browser fixtures. The live captures below show the earlier interface and are retained to illustrate real webpage and Google Docs use.
 
 ### On the web
 
@@ -211,7 +236,7 @@ npm test
 
 `npm run build` regenerates the included `dist/` folder. Development dependency installation requires internet access. Furigana readings require no external service; optional word definitions contact Wiktionary and require an internet connection.
 
-The test suite has **36 tests**, including automatic annotations, unchanged source/layout, a 100,000-node webpage, a 100-page Docs fixture, cancellation, IME handling, settings, corrections, vocabulary/name disambiguation, the reading panel, debounced refreshes, and bilingual word definitions. Browser integration tests use a temporary profile and localhost server. They default to Brave's standard macOS executable; set `CHROMIUM_PATH` to an extension-capable Chromium executable elsewhere. Chrome distributions that disable command-line extension loading cannot run these integration tests. Your normal browser profile and Google account are not used.
+The test suite has **42 tests**, including automatic annotations, unchanged source/layout, a 100,000-node webpage, a 100-page Docs fixture, cancellation, IME handling, settings, corrections, vocabulary/name disambiguation, the reading panel, debounced refreshes, bilingual word definitions, toolbar state and lifecycle, and expanded popup forms. Browser integration tests use a temporary profile and localhost server. They default to Brave's standard macOS executable; set `CHROMIUM_PATH` to an extension-capable Chromium executable elsewhere. Chrome distributions that disable command-line extension loading cannot run these integration tests. Your normal browser profile and Google account are not used.
 
 The README uses real-use screenshots supplied by the project owner. Earlier fixture captures are also preserved in [`docs/screenshots/`](docs/screenshots/). Regenerated browser captures are written to `test-results/` during tests.
 

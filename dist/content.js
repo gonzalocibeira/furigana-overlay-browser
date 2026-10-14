@@ -17,6 +17,32 @@
     }
   };
 
+  // src/ui-theme.ts
+  var uiTheme;
+  var init_ui_theme = __esm({
+    "src/ui-theme.ts"() {
+      "use strict";
+      uiTheme = `:root,:host{
+  color-scheme:light;
+  --ink:#242b2d;--muted:#625d50;--accent:#234e64;--seal:#9f3e2d;
+  --paper:#f4ecd8;--surface:#e6d8b9;--line:#242b2d;
+  --mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  --body:system-ui,-apple-system,"Hiragino Sans","Yu Gothic",sans-serif;
+}
+*{box-sizing:border-box}
+button,input,select{border-radius:0}
+button.primary{background:var(--seal);color:var(--paper)}
+button.primary:hover{background:var(--ink)}
+button:disabled{opacity:.45;cursor:default}
+button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible,a:focus-visible{
+  outline:3px solid var(--accent);outline-offset:3px;
+}
+[hidden]{display:none!important}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+`;
+    }
+  });
+
   // src/shared.ts
   var hiragana;
   var init_shared = __esm({
@@ -170,10 +196,11 @@
   var init_reading_panel = __esm({
     "src/reading-panel.ts"() {
       "use strict";
+      init_ui_theme();
       init_preferences();
       init_definitions();
       ReadingPanel = class {
-        host = document.createElement("fob-reading-view");
+        host = document.createElement("ko-reading-view");
         root = this.host.attachShadow({ mode: "closed" });
         content;
         status;
@@ -194,12 +221,12 @@
         }
         constructor(close, saveWidth) {
           this.saveWidth = saveWidth;
-          this.root.innerHTML = `<style>
-:host{all:initial!important;position:fixed!important;right:12px!important;top:var(--reader-top,100px)!important;bottom:12px!important;width:min(var(--reader-width,420px),calc(100vw - 24px))!important;z-index:2147483647!important;display:block!important;contain:layout style!important;color-scheme:light!important}*{box-sizing:border-box}.reader{height:100%;display:flex;flex-direction:column;background:#fffdf7;color:#193f3c;border:1px solid #cbd8ce;border-radius:16px;box-shadow:0 8px 36px #193f3c26;overflow:hidden;font:13px/1.5 system-ui,sans-serif}.reader.high{color:#101010;background:#fff}.header{display:flex;align-items:center;gap:12px;padding:16px 18px;border-bottom:1px solid #dfe7e0}h2{font:700 16px/1.3 system-ui;margin:0}small{display:block;color:#647572;font-size:11px;margin-top:3px}button{margin-left:auto;flex:none;background:transparent;border:1px solid #cbd8ce;border-radius:8px;color:inherit;cursor:pointer;padding:6px 9px;font:600 12px system-ui}button:focus-visible,.content:focus-visible{outline:2px solid #c28637;outline-offset:-3px}.content{padding:18px 22px 28px;overflow:auto;overscroll-behavior:contain;flex:1;min-height:0;font:var(--reader-font,20px) system-ui,sans-serif;user-select:text}.line{margin:0;line-height:var(--reader-spacing,2.8);white-space:pre-wrap;overflow-wrap:anywhere}ruby{ruby-position:over;ruby-align:center}rt{font:var(--reader-ruby,.5em)/1 system-ui,sans-serif}.empty{font:13px/1.6 system-ui;color:#647572}.status{margin:0;padding:10px 18px;border-top:1px solid #dfe7e0;color:#647572;font-size:11px}@media print{:host{display:none!important}}
-.word{display:inline;margin:0;padding:0;border:0;border-radius:3px;font:inherit;line-height:inherit;color:inherit;white-space:inherit;user-select:text}.word:hover,.word[aria-pressed=true]{background:#e4ebde;text-decoration:underline;text-decoration-color:#b18a46;text-underline-offset:5px}.word:focus-visible{outline-offset:2px}.definition[hidden]{display:none}.definition{flex:none;max-height:44%;overflow:auto;padding:14px 18px;border-top:1px solid #cbd8ce;background:#f3f6ee}.high .definition{background:#fff}.definition header{display:flex;align-items:center;gap:8px}.definition h3{font-size:18px;margin:0;overflow-wrap:anywhere}.definition h4{margin:12px 0 4px;font-size:12px}.definition p{margin:4px 0;overflow-wrap:anywhere}.definition ol{margin:4px 0;padding-left:20px}.definition a{color:inherit;text-underline-offset:2px}.definition .source{font-size:10px;color:#647572}.definition .pronunciation{font-size:12px;color:#647572}.definition .feedback{font-size:12px;color:#647572}
-
-[hidden]{display:none!important}.resize{position:absolute;left:-5px;top:16px;bottom:16px;width:10px;cursor:ew-resize;touch-action:none;border-radius:8px}.resize:hover,.resize:focus-visible{background:#206b5c55;outline:2px solid #206b5c}.correction-form{margin-top:10px;padding-top:10px;border-top:1px solid #cbd8ce}.correction-form label{display:block;font-size:11px;margin:6px 0}.correction-form input{display:block;width:100%;font:14px system-ui;padding:6px;border:1px solid #cbd8ce;border-radius:6px}.correction-actions{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.correction-actions button{margin:0;font-size:11px}.feedback[data-error=true]{color:#9c3c2d}input:focus-visible{outline:2px solid #c28637;outline-offset:2px}
-</style><div class="resize" role="separator" tabindex="0" aria-label="Reading panel width" aria-orientation="vertical" aria-valuemin="280" aria-valuemax="720" aria-valuenow="420"></div><section class="reader" role="region" aria-label="Furigana reading view"><header class="header"><div><h2>Reading view</h2><small>Click a word for English / \u65E5\u672C\u8A9E definitions online</small></div><button type="button" aria-label="Close reading view">Close</button></header><div class="content" tabindex="0" aria-label="Page reading text" lang="ja"></div><section class="definition" aria-label="Word definition" aria-live="polite" hidden></section><p class="status" role="status" aria-live="polite"></p></section>`;
+          this.root.innerHTML = `<style>${uiTheme}
+:host{all:initial!important;position:fixed!important;right:12px!important;top:var(--reader-top,100px)!important;bottom:12px!important;width:min(var(--reader-width,420px),calc(100vw - 24px))!important;z-index:2147483647!important;display:block!important;contain:layout style!important;color-scheme:light!important}
+.reader{height:100%;display:flex;flex-direction:column;background:var(--paper);color:var(--ink);border:2px solid var(--line);overflow:hidden;font:13px/1.5 var(--body)}.reader.high{background:#fff;color:#101010}.header{display:flex;align-items:center;gap:10px;padding:16px;border-bottom:4px solid var(--line);background:var(--surface)}.header>div{min-width:0}h2{font:900 16px/1.2 var(--mono);text-transform:uppercase;letter-spacing:-.5px;margin:0}small{display:block;color:var(--muted);font-size:11px;margin-top:6px}button{margin-left:auto;flex:none;background:var(--paper);border:2px solid var(--line);color:inherit;cursor:pointer;padding:7px 9px;font:700 11px/1.4 var(--mono)}button:hover{background:var(--surface)}.content:focus-visible{outline:3px solid var(--accent);outline-offset:-5px}.content{padding:20px 22px 28px;overflow:auto;overscroll-behavior:contain;flex:1;min-height:0;font:var(--reader-font,20px) var(--body);user-select:text}.line{margin:0;line-height:var(--reader-spacing,2.8);white-space:pre-wrap;overflow-wrap:anywhere}ruby{ruby-position:over;ruby-align:center}rt{font:var(--reader-ruby,.5em)/1 var(--body)}.empty{font:13px/1.6 var(--body);color:var(--muted)}.status{margin:0;padding:12px 16px;border-top:2px solid var(--line);background:var(--surface);color:var(--muted);font:10px/1.6 var(--mono)}@media print{:host{display:none!important}}
+.word{display:inline;margin:0;padding:0;border:0;background:transparent;font:inherit;line-height:inherit;color:inherit;white-space:inherit;user-select:text}.word:hover,.word[aria-pressed=true]{background:var(--surface);color:var(--accent);text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:5px}.word:focus-visible{outline-offset:2px}.definition{flex:none;max-height:44%;overflow:auto;padding:16px;border-top:4px solid var(--line);background:var(--surface)}.high .definition{background:var(--paper)}.definition header{display:flex;align-items:center;gap:8px}.definition h3{font-size:20px;margin:0;overflow-wrap:anywhere}.definition h4{margin:14px 0 6px;font:800 11px/1.4 var(--mono);text-transform:uppercase}.definition p{margin:6px 0;overflow-wrap:anywhere}.definition ol{margin:6px 0;padding-left:20px}.definition a{color:var(--accent);text-underline-offset:3px}.definition .source{font-size:10px;color:var(--muted)}.definition .pronunciation{font-size:12px;color:var(--muted)}.definition .feedback{font-size:12px;color:var(--muted)}
+.resize{position:absolute;left:-6px;top:16px;bottom:16px;width:12px;cursor:ew-resize;touch-action:none}.resize:after{content:"";position:absolute;left:5px;top:0;bottom:0;width:3px;background:var(--line)}.resize:hover:after,.resize:focus-visible:after{background:var(--accent)}.resize:focus-visible{outline:3px solid var(--accent);outline-offset:0}.correction-form{margin-top:12px;padding-top:12px;border-top:2px solid var(--line)}.correction-form label{display:block;font-size:11px;font-weight:700;margin:8px 0}.correction-form input{display:block;width:100%;font:14px var(--body);color:var(--ink);background:var(--paper);padding:8px;border:2px solid var(--line);margin-top:6px}.correction-actions{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}.correction-actions button{margin:0;font-size:11px}.feedback[data-error=true]{color:var(--ink);font-weight:700;border-left:3px solid var(--line);padding-left:8px}.feedback[data-error=true]:before{content:"! "}
+</style><div class="resize" role="separator" tabindex="0" aria-label="Reading panel width" aria-orientation="vertical" aria-valuemin="280" aria-valuemax="720" aria-valuenow="420"></div><section class="reader" role="region" aria-label="K\u014D reading view"><header class="header"><div><h2>Reading view</h2><small>Click a word for English / \u65E5\u672C\u8A9E definitions online</small></div><button type="button" aria-label="Close reading view">Close</button></header><div class="content" tabindex="0" aria-label="Page reading text" lang="ja"></div><section class="definition" aria-label="Word definition" aria-live="polite" hidden></section><p class="status" role="status" aria-live="polite"></p></section>`;
           this.resizeHandle = this.root.querySelector(".resize");
           const finish = () => {
             if (!this.resizeStart) return;
@@ -412,6 +439,7 @@
           actions.className = "correction-actions";
           const save = document.createElement("button");
           save.type = "submit";
+          save.className = "primary";
           save.textContent = "Save correction";
           const restore = document.createElement("button");
           restore.type = "button";
@@ -616,13 +644,13 @@
       var hostname = location.hostname || (location.ancestorOrigins[0] ? new URL(location.ancestorOrigins[0]).hostname : "");
       var docs = location.hostname === "docs.google.com" && location.pathname.startsWith("/document/");
       if (docs) {
-        const init = () => window.dispatchEvent(new CustomEvent("fob-docs-init", { detail: chrome.runtime.id }));
+        const init = () => window.dispatchEvent(new CustomEvent("ko-docs-init", { detail: chrome.runtime.id }));
         init();
         setTimeout(init, 0);
       }
-      var host = document.createElement("fob-overlay");
+      var host = document.createElement("ko-overlay");
       var shadow = host.attachShadow({ mode: "closed" });
-      shadow.innerHTML = `<style>:host{all:initial!important;position:fixed!important;inset:0!important;pointer-events:none!important;z-index:2147483646!important;overflow:hidden!important;contain:strict!important}span{position:absolute;white-space:nowrap;line-height:1;font-family:system-ui,sans-serif;color:var(--fob-color,#15232b);text-shadow:0 0 2px var(--fob-bg,white);pointer-events:none;user-select:none}@media print{:host{display:none!important}}</style><div aria-hidden="true"></div>`;
+      shadow.innerHTML = `<style>:host{all:initial!important;position:fixed!important;inset:0!important;pointer-events:none!important;z-index:2147483646!important;overflow:hidden!important;contain:strict!important}span{position:absolute;white-space:nowrap;line-height:1;font-family:system-ui,sans-serif;color:var(--ko-color,#15232b);text-shadow:0 0 2px var(--ko-bg,white);pointer-events:none;user-select:none}@media print{:host{display:none!important}}</style><div aria-hidden="true"></div>`;
       var layer = shadow.querySelector("div");
       var mutationObserver;
       var watchedShadows = /* @__PURE__ */ new WeakSet();
@@ -641,6 +669,13 @@
       var composing = false;
       var message = "Starting offline furigana\u2026";
       var statusState = "loading";
+      var toolbarAvailability = "unavailable";
+      function setToolbarAvailability(value) {
+        if (toolbarAvailability === value) return;
+        toolbarAvailability = value;
+        if (window === window.top) void chrome.runtime.sendMessage({ type: "toolbar-status-changed" }).catch(() => {
+        });
+      }
       var readingAppearance = appearance(void 0);
       var overrides = {};
       var legacyView;
@@ -1281,7 +1316,7 @@
                   }
                 }
               }
-              span.style.cssText = `left:${x}px;top:${y}px;font-size:${fontSize}px;--fob-color:${readingAppearance.contrast === "high" ? "#101010" : source.color};--fob-bg:${readingAppearance.contrast === "high" ? "white" : source.background === "rgba(0, 0, 0, 0)" ? "white" : source.background}${readingAppearance.contrast === "high" ? ";text-shadow:0 0 2px white,1px 0 white,-1px 0 white,0 1px white,0 -1px white" : ""}`;
+              span.style.cssText = `left:${x}px;top:${y}px;font-size:${fontSize}px;--ko-color:${readingAppearance.contrast === "high" ? "#101010" : source.color};--ko-bg:${readingAppearance.contrast === "high" ? "white" : source.background === "rgba(0, 0, 0, 0)" ? "white" : source.background}${readingAppearance.contrast === "high" ? ";text-shadow:0 0 2px white,1px 0 white,-1px 0 white,0 1px white,0 -1px white" : ""}`;
               layer.append(span);
               collisions.add(box);
               count++;
@@ -1295,6 +1330,7 @@
             if (readingMode) reader?.unavailable(message);
           }
         } finally {
+          if (version === revision && allowed()) setToolbarAvailability(statusState === "unavailable" ? "unavailable" : "ready");
           running = false;
           if (revision !== version && allowed()) {
             window.clearTimeout(timer);
@@ -1303,7 +1339,7 @@
         }
       }
       chrome.runtime.onMessage.addListener((request, _sender, respond) => {
-        if (request?.type === "status") respond({ message, state: statusState });
+        if (request?.type === "status") respond({ message, state: statusState, toolbarAvailability });
       });
       chrome.storage.onChanged.addListener((changes, area) => {
         if (area !== "local" || !["enabled", "excluded", "siteAppearance", "readingOverrides", "docsReadingView", "readingView"].some((key) => key in changes)) return;
@@ -1370,6 +1406,7 @@
         document.addEventListener("visibilitychange", () => schedule(0));
         document.fonts.addEventListener("loadingdone", () => schedule());
         if (!allowed()) message = "Disabled for this page.";
+        setToolbarAvailability("ready");
         schedule(0);
       }
       if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => void start(), { once: true });

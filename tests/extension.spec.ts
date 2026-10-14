@@ -9,7 +9,7 @@ test.beforeAll(async () => {
   server = createServer((_req,res) => {res.setHeader('Content-Type','text/html; charset=utf-8');res.end(fixture);});
   await new Promise<void>(r => server.listen(0,'127.0.0.1',r));
   base = `http://127.0.0.1:${(server.address() as {port:number}).port}`;
-  profile = await mkdtemp(resolve(tmpdir(),'fob-test-'));
+  profile = await mkdtemp(resolve(tmpdir(),'ko-test-'));
   const path = resolve('dist');
   context = await chromium.launchPersistentContext(profile, {
     executablePath: process.env.CHROMIUM_PATH ?? '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser',
@@ -24,7 +24,7 @@ async function annotations(page:Page) {
   try {
     const tree = await session.send('DOM.getDocument',{depth:-1,pierce:true});
     let shadow:number|undefined;
-    function visit(n:any) {if(n.nodeName === 'FOB-OVERLAY') shadow=n.shadowRoots?.[0]?.nodeId; for(const c of [...(n.children??[]),...(n.shadowRoots??[])]) visit(c);}
+    function visit(n:any) {if(n.nodeName === 'KO-OVERLAY') shadow=n.shadowRoots?.[0]?.nodeId; for(const c of [...(n.children??[]),...(n.shadowRoots??[])]) visit(c);}
     visit(tree.root); if(!shadow) return [];
     const resolved = await session.send('DOM.resolveNode',{nodeId:shadow});
     const result = await session.send('Runtime.callFunctionOn',{objectId:resolved.object.objectId, functionDeclaration:'function(){return Array.from(this.querySelectorAll("span"),s=>({text:s.textContent,top:s.getBoundingClientRect().top,left:s.getBoundingClientRect().left,fontSize:parseFloat(getComputedStyle(s).fontSize),color:getComputedStyle(s).color}))}',returnByValue:true});
@@ -80,12 +80,12 @@ test('automatic offline readings preserve source, react to changes, and disable 
   await expect.poll(async()=> (await annotations(page)).map(a=>a.text),{timeout:30000}).toContain('にほんご');
   expect((await annotations(page)).map(a=>a.text)).toContain('た');
   expect((await annotations(page)).filter(a=>a.text==='にほんご')).toHaveLength(2);
-  await expect(page.locator('fob-overlay')).toBeVisible();
+  await expect(page.locator('ko-overlay')).toBeVisible();
   await page.screenshot({path:test.info().outputPath('furigana-before-print.png'),caret:'initial'});
   await page.emulateMedia({media:'print'});
-  expect(await page.locator('fob-overlay').isVisible()).toBe(false);
+  expect(await page.locator('ko-overlay').isVisible()).toBe(false);
   await page.emulateMedia({media:'screen'});
-  await expect(page.locator('fob-overlay')).toBeVisible();
+  await expect(page.locator('ko-overlay')).toBeVisible();
   await expect.poll(async()=> (await annotations(page)).length).toBeGreaterThan(0);
   await page.screenshot({path:test.info().outputPath('furigana.png'),caret:'initial'});
   const after=await page.locator('#text').evaluate(el=>({html:el.innerHTML,rect:el.getBoundingClientRect().toJSON()}));
@@ -109,8 +109,8 @@ test('large webpage remains bounded and annotates newly visible content',async()
 });
 test('Docs fixture initializes bridge and switches between 100 pages',async()=>{
   const page=await context.newPage();
-  await page.route('https://docs.google.com/document/d/fob-fixture/edit',route=>route.fulfill({contentType:'text/html',body:`<!doctype html><meta charset="utf-8"><style>body{margin:0}.kix-page{height:950px;width:700px;margin:20px;border:1px solid}</style><div class="kix-appview-editor">${Array.from({length:100},(_,i)=>`<div class="kix-page" data-page="${i}"><svg width="700" height="200"><g data-font-css="24px system-ui"><rect x="40" y="80" width="96" height="28" aria-label="${i%2?'図書館':'日本語'}" fill="transparent"/></g></svg></div>`).join('')}</div>`}));
-  await page.goto('https://docs.google.com/document/d/fob-fixture/edit');
+  await page.route('https://docs.google.com/document/d/ko-fixture/edit',route=>route.fulfill({contentType:'text/html',body:`<!doctype html><meta charset="utf-8"><style>body{margin:0}.kix-page{height:950px;width:700px;margin:20px;border:1px solid}</style><div class="kix-appview-editor">${Array.from({length:100},(_,i)=>`<div class="kix-page" data-page="${i}"><svg width="700" height="200"><g data-font-css="24px system-ui"><rect x="40" y="80" width="96" height="28" aria-label="${i%2?'図書館':'日本語'}" fill="transparent"/></g></svg></div>`).join('')}</div>`}));
+  await page.goto('https://docs.google.com/document/d/ko-fixture/edit');
   await expect.poll(()=>page.evaluate(()=>(window as any)._docs_annotate_canvas_by_ext)).toBe(extension);
   await expect.poll(async()=> (await annotations(page)).map(a=>a.text),{timeout:30000}).toContain('にほんご');
   await page.locator('[data-page="99"]').evaluate(el=>el.scrollIntoView({block:'start'}));
@@ -156,10 +156,12 @@ test('Docs pageless dense lines use glyph ink, deduplicate tiles, and clip toolb
       return `<rect x="80" y="${y}" width="${metrics.width}" height="17.6" aria-label="${text}" data-font-css='400 14.6667px Arial'/><text x="80" y="${baseline}" fill="black" style="font:400 14.6667px Arial">${text}</text>`;
     }).join('');
   },lines);
-  await page.route('https://docs.google.com/document/d/fob-dense/edit',route=>route.fulfill({contentType:'text/html',body:`<!doctype html><meta charset="utf-8"><style>body{margin:0}.toolbar{position:fixed;top:0;width:100%;height:100px;background:white;z-index:2}.kix-appview-editor{position:absolute;top:100px;width:900px;height:600px;overflow:hidden}</style><div class="toolbar">Toolbar</div><div class="kix-appview-editor"><svg width="900" height="600"><g fill="none">${body}<rect x="80" y="-50" width="60" height="17.6" aria-label="日本語" data-font-css="14.6667px Arial"/></g></svg><svg style="position:absolute;inset:0" width="900" height="600"><g fill="none">${body}</g></svg></div>`}));
-  await page.goto('https://docs.google.com/document/d/fob-dense/edit');
+  await page.route('https://docs.google.com/document/d/ko-dense/edit',route=>route.fulfill({contentType:'text/html',body:`<!doctype html><meta charset="utf-8"><style>body{margin:0}.toolbar{position:fixed;top:0;width:100%;height:100px;background:white;z-index:2}.kix-appview-editor{position:absolute;top:100px;width:900px;height:600px;overflow:hidden}</style><div class="toolbar">Toolbar</div><div class="kix-appview-editor"><svg width="900" height="600"><g fill="none">${body}<rect x="80" y="-50" width="60" height="17.6" aria-label="日本語" data-font-css="14.6667px Arial"/></g></svg><svg style="position:absolute;inset:0" width="900" height="600"><g fill="none">${body}</g></svg></div>`}));
+  await page.goto('https://docs.google.com/document/d/ko-dense/edit');
   await expect.poll(async()=> (await annotations(page)).map(a=>a.text),{timeout:30000}).toContain('こしょう');
   await expect.poll(async()=> (await annotations(page)).map(a=>a.text)).toContain('びょうき');
+  // The first readings can appear while later batches are still being rendered.
+  await expect.poll(async()=> (await annotations(page)).length).toBeGreaterThan(6);
   const readings=await annotations(page);
   expect(readings.filter(a=>a.text==='こしょう')).toHaveLength(1);
   expect(readings.some(a=>a.text==='にほんご')).toBe(false);
@@ -191,6 +193,61 @@ test('popup shows page status, persists switches, and loads packaged branding',a
   await popup.getByRole('switch',{name:/Automatic readings/}).check();
   await expect.poll(async()=> (await annotations(page)).length).toBeGreaterThan(0);
   await popup.close();await page.close();
+});
+
+test('toolbar follows tab preferences and navigation, stays active without kanji, and recovers Docs availability',async()=>{
+  await settings({enabled:true,excluded:[],readingView:{sites:{},spacing:2.8,fontSize:20,width:420}});
+  const worker=context.serviceWorkers()[0],page=await context.newPage();
+  const url=`${base}/toolbar-empty`;
+  await page.route(url,route=>route.fulfill({contentType:'text/html',body:'<!doctype html><p>No Japanese text here.</p>'}));
+  await page.goto(url);
+  const tabId=await worker.evaluate(async url=>(await chrome.tabs.query({url}))[0].id!,url);
+  const title=()=>worker.evaluate(tabId=>chrome.action.getTitle({tabId}),tabId);
+  await expect.poll(title).toContain('active on 127.0.0.1');
+  await page.evaluate(()=>{document.dispatchEvent(new Event('scroll'));document.dispatchEvent(new CompositionEvent('compositionstart',{bubbles:true}));});
+  expect(await title()).toContain('active on 127.0.0.1');
+  await page.evaluate(()=>document.dispatchEvent(new CompositionEvent('compositionend',{bubbles:true})));
+  await settings({excluded:['127.0.0.1']});await expect.poll(title).toContain('paused on 127.0.0.1');
+  await settings({enabled:false});await expect.poll(title).toContain('paused everywhere');
+  await settings({enabled:true,excluded:[]});await expect.poll(title).toContain('active on 127.0.0.1');
+  const unsupported=await worker.evaluate(async()=>(await chrome.tabs.create({url:'about:blank',active:true})).id!);
+  await expect.poll(()=>worker.evaluate(tabId=>chrome.action.getTitle({tabId}),unsupported)).toContain('unavailable on this page');
+  expect(await title()).toContain('active on 127.0.0.1');
+  await worker.evaluate(tabId=>chrome.tabs.update(tabId,{active:true}),tabId);
+  await expect.poll(title).toContain('active on 127.0.0.1');
+  await worker.evaluate(tabId=>chrome.tabs.remove(tabId),unsupported);
+  await page.goto('about:blank');await expect.poll(title).toContain('unavailable on this page');
+  await page.goto(url);await expect.poll(title).toContain('active on 127.0.0.1');
+  await page.evaluate(()=>history.pushState({},'',location.pathname+'#reading'));
+  await expect.poll(title).toContain('active on 127.0.0.1');
+  const docsUrl='https://docs.google.com/document/d/toolbar-availability/edit';
+  await page.route(docsUrl,route=>route.fulfill({contentType:'text/html',body:'<!doctype html><style>.kix-appview-editor{position:absolute;top:100px;width:900px;height:600px}</style><div class="kix-appview-editor"></div>'}));
+  await page.goto(docsUrl);await expect.poll(title).toContain('Docs text is unavailable');
+  await page.locator('.kix-appview-editor').evaluate(el=>{el.innerHTML='<svg width="900" height="600"><rect x="40" y="60" width="96" height="28" aria-label="日本語" data-font-css="24px system-ui"/></svg>';});
+  await expect.poll(title).toContain('active on docs.google.com');
+  await page.close();
+});
+
+test('popup handles long hostnames and expanded forms without horizontal overflow',async()=>{
+  const hostname=`${'long-'.repeat(8)}example.test`,url=`https://${hostname}/read`;
+  const page=await context.newPage();await page.route(url,route=>route.fulfill({contentType:'text/html; charset=utf-8',body:fixture}));await page.goto(url);
+  const popup=await context.newPage();await popup.setViewportSize({width:380,height:580});await page.bringToFront();await popup.goto(`chrome-extension://${extension}/popup.html`);
+  await expect(popup.locator('#site')).toHaveText(hostname);
+  const reading=popup.locator('#view-reading-panel summary');await reading.focus();await popup.keyboard.press('Enter');
+  await expect(popup.locator('#view-reading-panel')).toHaveAttribute('open','');
+  await popup.locator('body').screenshot({path:test.info().outputPath('popup-reading.png')});
+  await popup.locator('#appearance-panel summary').click();await popup.locator('#correction-panel summary').click();
+  await popup.getByLabel('Word or name',{exact:true}).fill('日本語');
+  await popup.getByLabel('Reading',{exact:true}).fill('にほんご');
+  await popup.getByRole('button',{name:'Save correction',exact:true}).click();
+  await expect(popup.locator('#corrections')).toContainText('にほんご');
+  const dimensions=await popup.locator('body').evaluate(el=>({width:el.clientWidth,scrollWidth:el.scrollWidth,height:el.clientHeight,scrollHeight:el.scrollHeight}));
+  expect(dimensions.width).toBe(380);expect(dimensions.scrollWidth).toBe(380);expect(dimensions.height).toBeLessThanOrEqual(580);expect(dimensions.scrollHeight).toBeGreaterThan(dimensions.height);
+  await popup.locator('#correction-search').focus();await expect(popup.locator('#correction-search')).toBeFocused();
+  await popup.locator('#view-reading-panel summary').click();await popup.locator('#appearance-panel summary').click();
+  await popup.locator('#correction-search').focus();
+  await popup.screenshot({path:test.info().outputPath('popup-corrections.png'),clip:{x:0,y:0,width:380,height:580}});
+  await settings({readingOverrides:{}});await popup.close();await page.close();
 });
 
 test('site appearance and local corrections update automatically, persist, and preserve source',async()=>{
@@ -263,7 +320,7 @@ async function readerEval(page:Page,fn:string) {
   const session=await context.newCDPSession(page);
   try {
     const tree=await session.send('DOM.getDocument',{depth:-1,pierce:true});let shadow:number|undefined;
-    function visit(n:any){if(n.nodeName==='FOB-READING-VIEW')shadow=n.shadowRoots?.[0]?.nodeId;for(const c of [...(n.children??[]),...(n.shadowRoots??[])])visit(c);}
+    function visit(n:any){if(n.nodeName==='KO-READING-VIEW')shadow=n.shadowRoots?.[0]?.nodeId;for(const c of [...(n.children??[]),...(n.shadowRoots??[])])visit(c);}
     visit(tree.root);if(!shadow)return null;
     const object=await session.send('DOM.resolveNode',{nodeId:shadow});
     const result=await session.send('Runtime.callFunctionOn',{objectId:object.object.objectId,functionDeclaration:fn,returnByValue:true});
@@ -305,16 +362,16 @@ test('optional Docs reading view spaces ruby, follows active page and edits, pre
   await page.locator('[data-page="1"]').evaluate(el=>el.scrollIntoView({block:'start'}));
   await expect.poll(async()=> (await readerEval(page,readerSnapshot))?.readings).toContain('としょかん');
   expect((await readerEval(page,readerSnapshot)).lines).toEqual(['図書館で本を読む。']);
-  await page.emulateMedia({media:'print'});await expect(page.locator('fob-reading-view')).toBeHidden();await page.emulateMedia({media:'screen'});
+  await page.emulateMedia({media:'print'});await expect(page.locator('ko-reading-view')).toBeHidden();await page.emulateMedia({media:'screen'});
   await readerEval(page,`function(){this.querySelector('button').click();return true}`);
-  await expect(page.locator('fob-reading-view')).toHaveCount(0);
+  await expect(page.locator('ko-reading-view')).toHaveCount(0);
   await expect.poll(async()=> (await annotations(page)).map(a=>a.text)).toContain('としょかん');
   await popup.close();const reopened=await context.newPage();await page.bringToFront();await reopened.goto(`chrome-extension://${extension}/popup.html`);
   await expect(reopened.locator('#view-reading-enabled')).not.toBeChecked();await expect(reopened.locator('#view-reading-spacing')).toHaveValue('3.4');
   await reopened.locator('#view-reading-panel summary').click();await reopened.getByRole('switch',{name:/Extra-space reading view/}).check();
   await expect.poll(async()=> (await readerEval(page,readerSnapshot))?.readings).toContain('としょかん');
-  await settings({enabled:false});await expect(page.locator('fob-reading-view')).toHaveCount(0);
-  await settings({enabled:true,excluded:['docs.google.com']});await expect(page.locator('fob-reading-view')).toHaveCount(0);
+  await settings({enabled:false});await expect(page.locator('ko-reading-view')).toHaveCount(0);
+  await settings({enabled:true,excluded:['docs.google.com']});await expect(page.locator('ko-reading-view')).toHaveCount(0);
   await settings({excluded:[]});await expect.poll(async()=> (await readerEval(page,readerSnapshot))?.readings).toContain('としょかん');
   await settings({docsReadingView:{enabled:false,spacing:2.8},readingOverrides:{}});await reopened.close();await page.close();
 });
@@ -392,7 +449,7 @@ test('Docs word clicks show bilingual definitions, use lemmas, cache results, an
     await expect.poll(async()=> (await readerEval(page,readerSnapshot))?.lines).toContain('先生です。');
     expect((await readerEval(page,snapshot)).hidden).toBe(true);
     await readerEval(page,`function(){this.querySelector('.header button').click()}`);
-    await expect(page.locator('fob-reading-view')).toHaveCount(0);
+    await expect(page.locator('ko-reading-view')).toHaveCount(0);
   } finally {
     await context.unroute('https://*.wiktionary.org/w/api.php*');
     await settings({docsReadingView:{enabled:false,spacing:2.8}});await page.close();
@@ -447,7 +504,7 @@ test('Docs panel debounces edits and preserves text, scroll, focus, and definiti
     expect(await readerEval(page,`function(){return this.querySelector('.definition').hidden}`)).toBe(true);
     // Pause still removes the panel immediately, even with a pending refresh.
     await page.locator('rect').first().evaluate(el=>el.setAttribute('aria-label','仕事です。'));
-    await settings({enabled:false});await expect(page.locator('fob-reading-view')).toHaveCount(0);
+    await settings({enabled:false});await expect(page.locator('ko-reading-view')).toHaveCount(0);
   } finally {
     await context.unroute('https://*.wiktionary.org/w/api.php*');
     await settings({enabled:true,docsReadingView:{enabled:false,spacing:2.8}});await page.close();
@@ -518,7 +575,7 @@ test('panel appearance and resizing preserve content, selection and definition; 
   expect((await readerEval(page,metrics)).selection).toContain('日本語');
   await readerEval(page,`function(){this.querySelector('.resize').focus()}`);await page.keyboard.press('ArrowLeft');
   await expect.poll(()=>context.serviceWorkers()[0].evaluate(async()=> (await chrome.storage.local.get('readingView')).readingView.width)).toBe(510);
-  const box=await page.locator('fob-reading-view').boundingBox();
+  const box=await page.locator('ko-reading-view').boundingBox();
   await page.mouse.move(box!.x,box!.y+30);await page.mouse.down();await page.mouse.move(box!.x-70,box!.y+30);
   expect(await context.serviceWorkers()[0].evaluate(async()=> (await chrome.storage.local.get('readingView')).readingView.width)).toBe(510);
   await page.mouse.up();
@@ -528,9 +585,9 @@ test('panel appearance and resizing preserve content, selection and definition; 
   await expect.poll(()=>readerEval(page,`function(){return this.host.getBoundingClientRect().width}`)).toBe(276);
   await page.setViewportSize({width:1000,height:800});
   const other=await context.newPage();await other.goto(base.replace('127.0.0.1','localhost'));
-  await expect.poll(async()=> (await annotations(other)).length,{timeout:30000}).toBeGreaterThan(0);await expect(other.locator('fob-reading-view')).toHaveCount(0);
-  await page.bringToFront();await readerEval(page,`function(){this.querySelector('.header button').click()}`);await expect(page.locator('fob-reading-view')).toHaveCount(0);
-  await page.reload();await expect.poll(async()=> (await annotations(page)).length).toBeGreaterThan(0);await expect(page.locator('fob-reading-view')).toHaveCount(0);
+  await expect.poll(async()=> (await annotations(other)).length,{timeout:30000}).toBeGreaterThan(0);await expect(other.locator('ko-reading-view')).toHaveCount(0);
+  await page.bringToFront();await readerEval(page,`function(){this.querySelector('.header button').click()}`);await expect(page.locator('ko-reading-view')).toHaveCount(0);
+  await page.reload();await expect.poll(async()=> (await annotations(page)).length).toBeGreaterThan(0);await expect(page.locator('ko-reading-view')).toHaveCount(0);
   await other.close();await page.close();await context.unroute('https://*.wiktionary.org/w/api.php*');
 });
 
@@ -583,6 +640,6 @@ test('web panel clips offscreen wrapped text, preserves hard breaks and shadow o
   expect(snapshot.lines.join('')).not.toMatch(/最初の印|最後の印|埋め込みの文章/);
   expect(snapshot.lines.indexOf('順序一。')).toBeGreaterThan(-1);
   expect(snapshot.lines.indexOf('順序二。')).toBeGreaterThan(snapshot.lines.indexOf('順序一。'));
-  for(const frame of page.frames())if(frame!==page.mainFrame())await expect(frame.locator('fob-reading-view')).toHaveCount(0);
+  for(const frame of page.frames())if(frame!==page.mainFrame())await expect(frame.locator('ko-reading-view')).toHaveCount(0);
   await page.close();await settings({readingView:{...webPanelSettings,sites:{}}});
 });

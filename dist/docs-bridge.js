@@ -12,7 +12,7 @@
   // src/docs-bridge.ts
   var require_docs_bridge = __commonJS({
     "src/docs-bridge.ts"() {
-      window.addEventListener("fob-docs-init", (event) => {
+      window.addEventListener("ko-docs-init", (event) => {
         const id = event.detail;
         if (typeof id === "string" && /^[a-p]{32}$/.test(id)) {
           window._docs_annotate_canvas_by_ext = id;

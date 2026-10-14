@@ -3,15 +3,16 @@ import {appearance,appearanceForSite,validOverrides,readingViewPreferences,panel
 import {AdaptivePacer} from './pacing';
 import { CollisionIndex } from './geometry';
 import type { Reading } from './shared';
+import type {PageStatus,ToolbarAvailability} from './action-state';
 const hostname = location.hostname || (location.ancestorOrigins[0] ? new URL(location.ancestorOrigins[0]).hostname : '');
 const docs = location.hostname === 'docs.google.com' && location.pathname.startsWith('/document/');
 if (docs) {
-  const init = () => window.dispatchEvent(new CustomEvent('fob-docs-init', {detail:chrome.runtime.id}));
+  const init = () => window.dispatchEvent(new CustomEvent('ko-docs-init', {detail:chrome.runtime.id}));
   init(); setTimeout(init, 0);
 }
-const host = document.createElement('fob-overlay');
+const host = document.createElement('ko-overlay');
 const shadow = host.attachShadow({mode:'closed'});
-shadow.innerHTML = `<style>:host{all:initial!important;position:fixed!important;inset:0!important;pointer-events:none!important;z-index:2147483646!important;overflow:hidden!important;contain:strict!important}span{position:absolute;white-space:nowrap;line-height:1;font-family:system-ui,sans-serif;color:var(--fob-color,#15232b);text-shadow:0 0 2px var(--fob-bg,white);pointer-events:none;user-select:none}@media print{:host{display:none!important}}</style><div aria-hidden="true"></div>`;
+shadow.innerHTML = `<style>:host{all:initial!important;position:fixed!important;inset:0!important;pointer-events:none!important;z-index:2147483646!important;overflow:hidden!important;contain:strict!important}span{position:absolute;white-space:nowrap;line-height:1;font-family:system-ui,sans-serif;color:var(--ko-color,#15232b);text-shadow:0 0 2px var(--ko-bg,white);pointer-events:none;user-select:none}@media print{:host{display:none!important}}</style><div aria-hidden="true"></div>`;
 const layer = shadow.querySelector('div')!;
 let mutationObserver: MutationObserver | undefined;
 const watchedShadows = new WeakSet<ShadowRoot>();
@@ -21,7 +22,13 @@ function observeShadow(root: ShadowRoot) {
 }
 let enabled = true, excluded: string[] = [], revision = 0, timer = 0, running = false, composing = false;
 let message = 'Starting offline furigana…';
-let statusState:'loading'|'active'|'paused'|'unavailable'='loading';
+let statusState:PageStatus['state']='loading';
+let toolbarAvailability:ToolbarAvailability='unavailable';
+function setToolbarAvailability(value:ToolbarAvailability) {
+  if(toolbarAvailability===value)return;
+  toolbarAvailability=value;
+  if(window===window.top)void chrome.runtime.sendMessage({type:'toolbar-status-changed'}).catch(()=>{});
+}
 let readingAppearance:Appearance=appearance(undefined);
 let overrides:Record<string,string>={};
 let legacyView:unknown;
@@ -468,14 +475,17 @@ async function scan() {
             if (hit.bottom > box.top && hit.top < box.bottom && hit.top < rect.top - 2) {skippedSpace++;continue;}
           }
         }
-        span.style.cssText = `left:${x}px;top:${y}px;font-size:${fontSize}px;--fob-color:${readingAppearance.contrast==='high'?'#101010':source.color};--fob-bg:${readingAppearance.contrast==='high'?'white':source.background === 'rgba(0, 0, 0, 0)' ? 'white' : source.background}${readingAppearance.contrast==='high'?';text-shadow:0 0 2px white,1px 0 white,-1px 0 white,0 1px white,0 -1px white':''}`;
+        span.style.cssText = `left:${x}px;top:${y}px;font-size:${fontSize}px;--ko-color:${readingAppearance.contrast==='high'?'#101010':source.color};--ko-bg:${readingAppearance.contrast==='high'?'white':source.background === 'rgba(0, 0, 0, 0)' ? 'white' : source.background}${readingAppearance.contrast==='high'?';text-shadow:0 0 2px white,1px 0 white,-1px 0 white,0 1px white,0 -1px white':''}`;
         layer.append(span); collisions.add(box); count++;
       }
     }
   } catch (error) { if(version===revision) {message = `Furigana unavailable: ${String(error)}`;statusState='unavailable';clear();if(readingMode)reader?.unavailable(message);} }
-  finally { running = false; if (revision !== version && allowed()) {window.clearTimeout(timer);timer=window.setTimeout(()=>void scan(),Math.max(0,nextScanAt-performance.now()));} }
+  finally {
+    if(version===revision && allowed())setToolbarAvailability(statusState==='unavailable'?'unavailable':'ready');
+    running = false; if (revision !== version && allowed()) {window.clearTimeout(timer);timer=window.setTimeout(()=>void scan(),Math.max(0,nextScanAt-performance.now()));}
+  }
 }
-chrome.runtime.onMessage.addListener((request, _sender, respond) => { if (request?.type === 'status') respond({message,state:statusState}); });
+chrome.runtime.onMessage.addListener((request, _sender, respond) => { if (request?.type === 'status') respond({message,state:statusState,toolbarAvailability} satisfies PageStatus); });
 chrome.storage.onChanged.addListener((changes, area) => {
   if(area!=='local' || !['enabled','excluded','siteAppearance','readingOverrides','docsReadingView','readingView'].some(key=>key in changes))return;
   const wasReading=readingModeEnabled();
@@ -517,6 +527,7 @@ async function start() {
   document.addEventListener('visibilitychange', () => schedule(0));
   document.fonts.addEventListener('loadingdone', () => schedule());
   if (!allowed()) message = 'Disabled for this page.';
+  setToolbarAvailability('ready');
   schedule(0);
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => void start(), {once:true}); else void start();

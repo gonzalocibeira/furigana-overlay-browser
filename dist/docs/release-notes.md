@@ -1,5 +1,16 @@
 # Release notes
 
+## Unreleased · Kō branding, woodblock palette, and toolbar status
+
+- Renamed the extension **Kō — Japanese Reading Companion**, aligning its name with the 考 mark. Warm paper, ink, muted indigo, and a vermilion seal replace the cobalt-and-gray palette. Repository, npm package, downloads, and internal UI identifiers now use `ko-japanese-reading-companion` / `ko-`. Existing saved settings, corrections, and version 1 backups are retained.
+
+- Redesigned the popup, reading panel, definition cards, and correction forms with square controls, bold monospace headings, ink borders, warm paper surfaces, indigo, and vermilion accents. Japanese reading text keeps a readable system font. The popup is 380 px wide with expandable settings and keyboard focus indicators.
+- The new 考 (think) mark appears in the branding and toolbar. A vermilion icon means readings are enabled and available on this tab; a sand-colored icon with a pause indicator means global or site pause; an outlined icon with a slash means unavailable or a reload is needed. Hover for the reason. The popup remains accessible in all states.
+- The toolbar stays active without visible kanji and during scrolling, typing, or background-tab processing pauses. State updates follow navigation, tab activation, preferences, availability recovery, and service-worker restarts. Embedded frames cannot set the top-level icon.
+- Existing settings, corrections, backup formats, overlay appearance, and permissions are preserved.
+
+Reload the extension, then reload open webpages and Google Docs tabs. The new screenshots in the README use browser fixtures; earlier live captures are retained for compatibility context.
+
 ## 0.5.0 · 14 October 2026
 
 - The reading panel now works on supported HTTP/HTTPS webpages as well as Google Docs, following visible text with bounded discovery and the existing quiet-period debounce. Activation is remembered per hostname. Existing Docs preferences migrate without enabling other websites.
@@ -41,6 +52,6 @@ The release is checked with `npm run build`, `npm run typecheck`, and all 27 Pla
 
 ### Updating
 
-Replace the contents of your existing extension folder with the updated `dist/` build. Click **Reload** for Furigana Overlay Browser on `chrome://extensions`, then reload open webpages and Google Docs tabs. Keeping the same extension folder helps retain preferences and saved corrections. No npm installation is needed to use the packaged extension.
+Replace the contents of your existing extension folder with the updated `dist/` build. Click **Reload** for Kō — Japanese Reading Companion on `chrome://extensions`, then reload open webpages and Google Docs tabs. Keeping the same extension folder helps retain preferences and saved corrections. No npm installation is needed to use the packaged extension.
 
 Standalone names can still be ambiguous and may need a local correction. Definitions require internet access, and the Docs adapter still depends on Google's undocumented text geometry.

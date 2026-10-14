@@ -1,4 +1,7 @@
 import {appearanceForSite,validOverrides,readingViewPreferences,panelEnabled,updateReadingView,saveCorrection,removeCorrection,mergeCorrectionBackup,correctionBackupLimit,correctionMatches} from './preferences';
+import {uiTheme} from './ui-theme';
+import type {PageStatus} from './action-state';
+const theme=document.createElement('style');theme.textContent=uiTheme;document.head.append(theme);
 async function main() {
   const [tab] = await chrome.tabs.query({active:true, currentWindow:true});
   let hostname='';
@@ -24,7 +27,7 @@ async function main() {
     if (excluded.checked) { show(`Readings are paused on ${hostname}.`,'paused'); return; }
     if (!hostname || tab?.id === undefined) { show('Open a webpage or Google Doc to see readings.','unavailable'); return; }
     try {
-      const response=await chrome.tabs.sendMessage(tab.id,{type:'status'},{frameId:0});
+      const response:PageStatus=await chrome.tabs.sendMessage(tab.id,{type:'status'},{frameId:0});
       if (current===revision) show(response.message,response.state ?? (/^Active|^No visible/.test(response.message)?'active':/unavailable|unsupported/i.test(response.message)?'unavailable':'loading'));
     } catch {
       if (current===revision) show('Reload this tab to start automatic readings. Browser-protected pages are unavailable.','unavailable');
@@ -125,17 +128,23 @@ async function main() {
   search.oninput=()=>renderCorrections(currentCorrections);
   chrome.storage.onChanged.addListener((changes,area)=>{
     if(area!=='local')return;
+    if(changes.enabled)enabled.checked=changes.enabled.newValue!==false;
+    if(changes.excluded)excluded.checked=Array.isArray(changes.excluded.newValue) && changes.excluded.newValue.includes(hostname);
+    if(changes.enabled || changes.excluded)changed();
     if(changes.readingOverrides)renderCorrections(validOverrides(changes.readingOverrides.newValue));
     if(changes.readingView) {
       const view=readingViewPreferences(changes.readingView.newValue,state.docsReadingView);
       viewEnabled.checked=panelEnabled(view,hostname);spacing.value=String(view.spacing);fontSize.value=String(view.fontSize);
     }
   });
+  chrome.runtime.onMessage.addListener((message,sender)=>{
+    if(message?.type==='toolbar-status-changed' && sender.frameId===0 && sender.tab?.id===tab?.id)void refresh();
+  });
   document.querySelector<HTMLButtonElement>('#export-corrections')!.onclick=async()=>{
     try {
       const latest=await chrome.storage.local.get({readingOverrides:{}});
       const blob=new Blob([JSON.stringify({version:1,corrections:validOverrides(latest.readingOverrides)},null,2)],{type:'application/json;charset=utf-8'});
-      const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='furigana-corrections.json';link.click();
+      const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='ko-reading-corrections.json';link.click();
       window.setTimeout(()=>URL.revokeObjectURL(url),1000);report('Correction backup exported.');
     } catch {report('Could not export corrections. Try again.',true);}
   };

@@ -1,7 +1,7 @@
 node_modules/
 test-results/
 playwright-report/
-furigana-overlay-browser.zip
+/*.zip
 
 .DS_Store
 .env

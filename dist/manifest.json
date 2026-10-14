@@ -1,6 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Furigana Overlay Browser",
+  "name": "Kō — Japanese Reading Companion",
+  "short_name": "Kō",
   "version": "0.5.0",
   "description": "Automatic offline furigana overlays for webpages and Google Docs.",
   "permissions": [
@@ -13,12 +14,12 @@
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
-      "16": "icons/icon-16.png",
-      "32": "icons/icon-32.png",
-      "48": "icons/icon-48.png",
-      "128": "icons/icon-128.png"
+      "16": "icons/icon-unavailable-16.png",
+      "32": "icons/icon-unavailable-32.png",
+      "48": "icons/icon-unavailable-48.png",
+      "128": "icons/icon-unavailable-128.png"
     },
-    "default_title": "Furigana \u2014 automatic offline readings"
+    "default_title": "Kō \u2014 checking this page"
   },
   "content_scripts": [
     {

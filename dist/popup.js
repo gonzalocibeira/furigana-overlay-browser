@@ -132,10 +132,40 @@
     }
   });
 
+  // src/ui-theme.ts
+  var uiTheme;
+  var init_ui_theme = __esm({
+    "src/ui-theme.ts"() {
+      "use strict";
+      uiTheme = `:root,:host{
+  color-scheme:light;
+  --ink:#242b2d;--muted:#625d50;--accent:#234e64;--seal:#9f3e2d;
+  --paper:#f4ecd8;--surface:#e6d8b9;--line:#242b2d;
+  --mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  --body:system-ui,-apple-system,"Hiragino Sans","Yu Gothic",sans-serif;
+}
+*{box-sizing:border-box}
+button,input,select{border-radius:0}
+button.primary{background:var(--seal);color:var(--paper)}
+button.primary:hover{background:var(--ink)}
+button:disabled{opacity:.45;cursor:default}
+button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible,a:focus-visible{
+  outline:3px solid var(--accent);outline-offset:3px;
+}
+[hidden]{display:none!important}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+`;
+    }
+  });
+
   // src/popup.ts
   var require_popup = __commonJS({
     "src/popup.ts"() {
       init_preferences();
+      init_ui_theme();
+      var theme = document.createElement("style");
+      theme.textContent = uiTheme;
+      document.head.append(theme);
       async function main() {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
         let hostname = "";
@@ -336,6 +366,9 @@
         search.oninput = () => renderCorrections(currentCorrections);
         chrome.storage.onChanged.addListener((changes, area) => {
           if (area !== "local") return;
+          if (changes.enabled) enabled.checked = changes.enabled.newValue !== false;
+          if (changes.excluded) excluded.checked = Array.isArray(changes.excluded.newValue) && changes.excluded.newValue.includes(hostname);
+          if (changes.enabled || changes.excluded) changed();
           if (changes.readingOverrides) renderCorrections(validOverrides(changes.readingOverrides.newValue));
           if (changes.readingView) {
             const view2 = readingViewPreferences(changes.readingView.newValue, state.docsReadingView);
@@ -344,13 +377,16 @@
             fontSize.value = String(view2.fontSize);
           }
         });
+        chrome.runtime.onMessage.addListener((message, sender) => {
+          if (message?.type === "toolbar-status-changed" && sender.frameId === 0 && sender.tab?.id === tab?.id) void refresh();
+        });
         document.querySelector("#export-corrections").onclick = async () => {
           try {
             const latest = await chrome.storage.local.get({ readingOverrides: {} });
             const blob = new Blob([JSON.stringify({ version: 1, corrections: validOverrides(latest.readingOverrides) }, null, 2)], { type: "application/json;charset=utf-8" });
             const url = URL.createObjectURL(blob), link = document.createElement("a");
             link.href = url;
-            link.download = "furigana-corrections.json";
+            link.download = "ko-reading-corrections.json";
             link.click();
             window.setTimeout(() => URL.revokeObjectURL(url), 1e3);
             report("Correction backup exported.");

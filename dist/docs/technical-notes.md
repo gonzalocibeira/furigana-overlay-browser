@@ -2,6 +2,14 @@
 
 For installation and screenshots, see the [project README](../README.md).
 
+## Interface and toolbar lifecycle
+
+The popup and reading panel share design tokens from `src/ui-theme.ts`. The popup uses a 380 px layout capped at 580 px with vertical scrolling; the reading panel retains its closed shadow root, selectable Japanese text, native ruby, width controls, and saved appearance settings. The brutalist theme changes extension controls and surfaces, not webpage overlay geometry or page-native colors. The outlined 考 logo is rasterized into active, paused, and unavailable PNGs without a runtime font or graphics dependency.
+
+The background's toolbar controller uses per-tab `chrome.action.setIcon` and `setTitle`. Global pause takes precedence, followed by hostname pause, then supported HTTP/HTTPS URL and top-frame availability. A missing receiver requests a reload; unavailable Docs geometry or a tokenizer failure supplies its diagnostic reason. The action stays clickable in all states. No additional permissions or persisted settings are required.
+
+The typed `status` response includes `toolbarAvailability` (`ready` or `unavailable`) independently of transient processing state. Initialization and changes in availability send `toolbar-status-changed`; only top-frame notifications trigger a fresh status probe. Routine scans, scrolling, IME composition, and hidden tabs do not toggle readiness. Navigation resets the icon while a new document loads; same-document URL updates recheck the existing document. Preference changes, activation, navigation completion, installation, browser startup, and each fresh service worker also refresh state. Per-tab revision tokens discard stale probes and late results for removed tabs. There is no continuous toolbar polling or source-text persistence.
+
 ## Reading customization
 
 Open **Reading appearance** in the popup to choose Small, Default, Large, or Extra large readings and page colors or high contrast. These choices are saved per hostname. Readings still shrink or disappear where necessary to preserve the original layout.

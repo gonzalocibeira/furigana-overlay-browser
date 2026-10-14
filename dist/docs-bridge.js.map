@@ -1,7 +1,7 @@
 {
   "version": 3,
   "sources": ["../src/docs-bridge.ts"],
-  "sourcesContent": ["// Keep page-world code minimal. The build replaces this with this installation's ID\n// supplied by the isolated content script; no privileged APIs enter the page world.\nwindow.addEventListener('fob-docs-init', (event) => {\n  const id = (event as CustomEvent).detail;\n  if (typeof id === 'string' && /^[a-p]{32}$/.test(id)) {\n    (window as unknown as Record<string, unknown>)._docs_annotate_canvas_by_ext = id;\n  }\n});\n"],
-  "mappings": ";;;;;;;;;;;;AAAA;AAAA;AAEA,aAAO,iBAAiB,iBAAiB,CAAC,UAAU;AAClD,cAAM,KAAM,MAAsB;AAClC,YAAI,OAAO,OAAO,YAAY,cAAc,KAAK,EAAE,GAAG;AACpD,UAAC,OAA8C,+BAA+B;AAAA,QAChF;AAAA,MACF,CAAC;AAAA;AAAA;",
+  "sourcesContent": ["// Keep page-world code minimal. The build replaces this with this installation's ID\n// supplied by the isolated content script; no privileged APIs enter the page world.\nwindow.addEventListener('ko-docs-init', (event) => {\n  const id = (event as CustomEvent).detail;\n  if (typeof id === 'string' && /^[a-p]{32}$/.test(id)) {\n    (window as unknown as Record<string, unknown>)._docs_annotate_canvas_by_ext = id;\n  }\n});\n"],
+  "mappings": ";;;;;;;;;;;;AAAA;AAAA;AAEA,aAAO,iBAAiB,gBAAgB,CAAC,UAAU;AACjD,cAAM,KAAM,MAAsB;AAClC,YAAI,OAAO,OAAO,YAAY,cAAc,KAAK,EAAE,GAAG;AACpD,UAAC,OAA8C,+BAA+B;AAAA,QAChF;AAAA,MACF,CAAC;AAAA;AAAA;",
   "names": []
 }
