@@ -80,6 +80,8 @@ Open the optional **Extra-space reading view** for a separate, selectable panel 
 
 The panel follows the active page as you scroll or edit. Continue editing in Docs; click **Close** on the panel to return to overlay readings. The setting is saved across your Google Docs documents.
 
+**Click a word for its meaning.** The panel shows English and Japanese definitions, the reading, and the dictionary form for inflected words. Words can also be focused with Tab and opened with Enter or Space; press Escape to dismiss the definition. Definitions come from the English and Japanese editions of Wiktionary and require an internet connection. Only the clicked word's dictionary form is sent for lookup. Each language shows its own unavailable or missing-entry message when necessary; source links let you open the full entry.
+
 These screenshots show real use on Japanese Wikipedia and in Google Docs. **Google Docs support is experimental**; compatibility can vary as Google's editor changes. The reading panel is text-only: tables and formatting may be simplified, and images are omitted.
 
 ## Make it yours
@@ -96,12 +98,12 @@ Readings shrink or are omitted when space is tight to preserve the original line
 
 ## Private by design
 
-**Japanese text is processed on your device.** The extension uses bundled Kuromoji/IPADIC dictionaries, with no external processing service, analytics, account, or runtime dictionary download. Only your settings and saved corrections are persisted.
+**Furigana is processed on your device.** Readings use bundled Kuromoji/IPADIC dictionaries. Optional word definitions in the Google Docs reading panel contact Wiktionary only when you click a word, sending its dictionary form. No full document or surrounding sentence is sent. There are no analytics or accounts. Only your settings and saved corrections are persisted.
 
 <details>
 <summary><strong>Permissions and local storage explained</strong></summary>
 
-Japanese text is processed locally with bundled Kuromoji/IPADIC dictionaries in an extension worker. There are no external API calls, analytics, accounts, or runtime dictionary downloads.
+Japanese readings are processed locally with bundled Kuromoji/IPADIC dictionaries in an extension worker. No runtime dictionary download is needed for readings. Clicking a word in the Docs panel requests definitions from `en.wiktionary.org` and `ja.wiktionary.org`, without credentials or a referrer. Definitions are cached in memory for up to 100 words per panel and are not saved to local storage. Wiktionary receives the requested word and the normal connection information, including your IP address.
 
 - The extension needs access to HTTP/HTTPS pages to add readings automatically without a per-page click. You can narrow access using Chrome's extension site-access controls; it will only run on permitted sites.
 - It requests local storage for preferences and user-entered corrections, plus an offscreen document for the tokenizer worker.
@@ -174,7 +176,7 @@ npm test
 
 `npm run build` regenerates the included `dist/` folder. Development dependency installation requires internet access; the installed extension works without an external processing service.
 
-The test suite has **20 tests**, including automatic annotations, unchanged source/layout, a 100,000-node webpage, a 100-page Docs fixture, cancellation, IME handling, settings, corrections, and the reading panel. Browser integration tests use a temporary profile and localhost server. They default to Brave's standard macOS executable; set `CHROMIUM_PATH` to an extension-capable Chromium executable elsewhere. Chrome distributions that disable command-line extension loading cannot run these integration tests. Your normal browser profile and Google account are not used.
+The test suite has **21 tests**, including automatic annotations, unchanged source/layout, a 100,000-node webpage, a 100-page Docs fixture, cancellation, IME handling, settings, corrections, the reading panel, and bilingual word definitions. Browser integration tests use a temporary profile and localhost server. They default to Brave's standard macOS executable; set `CHROMIUM_PATH` to an extension-capable Chromium executable elsewhere. Chrome distributions that disable command-line extension loading cannot run these integration tests. Your normal browser profile and Google account are not used.
 
 The README uses real-use screenshots supplied by the project owner. Earlier fixture captures are also preserved in [`docs/screenshots/`](docs/screenshots/). Regenerated browser captures are written to `test-results/` during tests.
 

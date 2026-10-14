@@ -1,6 +1,11 @@
 "use strict";
 (() => {
+  var __create = Object.create;
+  var __defProp = Object.defineProperty;
+  var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
   var __getOwnPropNames = Object.getOwnPropertyNames;
+  var __getProtoOf = Object.getPrototypeOf;
+  var __hasOwnProp = Object.prototype.hasOwnProperty;
   var __esm = (fn, res, err) => function __init() {
     if (err) throw err[0];
     try {
@@ -16,6 +21,22 @@
       throw mod = 0, e;
     }
   };
+  var __copyProps = (to, from, except, desc) => {
+    if (from && typeof from === "object" || typeof from === "function") {
+      for (let key of __getOwnPropNames(from))
+        if (!__hasOwnProp.call(to, key) && key !== except)
+          __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+    }
+    return to;
+  };
+  var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+    // If the importer is in node compatibility mode or this is not an ESM
+    // file that has been converted to a CommonJS file using a Babel-
+    // compatible transform (i.e. "__esModule" has not been set), then set
+    // "default" to the CommonJS "module.exports" for node compatibility.
+    isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+    mod
+  ));
 
   // src/shared.ts
   var hiragana;
@@ -55,10 +76,72 @@
     }
   });
 
+  // src/dictionary.ts
+  var require_dictionary = __commonJS({
+    "src/dictionary.ts"() {
+      "use strict";
+      var pending = /* @__PURE__ */ new Map();
+      async function page(language, word) {
+        try {
+          const url = new URL(`https://${language}.wiktionary.org/w/api.php`);
+          url.search = new URLSearchParams({ action: "parse", page: word, prop: "text", format: "json", formatversion: "2", redirects: "1", disableeditsection: "1" }).toString();
+          const response = await fetch(url, { credentials: "omit", referrerPolicy: "no-referrer", signal: AbortSignal.timeout(8e3) });
+          if (!response.ok) return { status: response.status === 404 ? "missing" : "error" };
+          const reader = response.body?.getReader();
+          if (!reader) return { status: "error" };
+          const chunks = [];
+          let size = 0;
+          for (; ; ) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            size += value.byteLength;
+            if (size > 1e6) {
+              await reader.cancel();
+              return { status: "error" };
+            }
+            chunks.push(value);
+          }
+          const bytes = new Uint8Array(size);
+          let offset = 0;
+          for (const chunk of chunks) {
+            bytes.set(chunk, offset);
+            offset += chunk.byteLength;
+          }
+          const data = JSON.parse(new TextDecoder().decode(bytes));
+          if (data.error) return { status: data.error.code === "missingtitle" ? "missing" : "error" };
+          return typeof data.parse?.text === "string" ? { status: "ok", html: data.parse.text, title: data.parse.title } : { status: "error" };
+        } catch {
+          return { status: "error" };
+        }
+      }
+      chrome.runtime.onMessage.addListener((message, sender, respond) => {
+        if (message?.type !== "define-word") return;
+        const url = sender.url ? new URL(sender.url) : void 0;
+        if (sender.tab?.id === void 0 || url?.origin !== "https://docs.google.com" || !url.pathname.startsWith("/document/") || typeof message.word !== "string" || !/^[\p{L}\p{M}\p{N}々〆ー・\s'-]{1,80}$/u.test(message.word) || !message.word.trim()) {
+          respond({ error: "Invalid dictionary request" });
+          return;
+        }
+        const word = message.word.trim();
+        let job = pending.get(word);
+        if (!job) {
+          if (pending.size >= 8) {
+            respond({ error: "Dictionary is busy. Try again." });
+            return;
+          }
+          job = Promise.all([page("en", word), page("ja", word)]).then(([en, ja]) => ({ en, ja })).finally(() => pending.delete(word));
+          pending.set(word, job);
+        }
+        void job.then(respond);
+        return true;
+      });
+    }
+  });
+
   // src/background.ts
   var require_background = __commonJS({
     "src/background.ts"() {
       init_preferences();
+      var import_dictionary = __toESM(require_dictionary());
       var creating;
       async function ensureOffscreen() {
         const contexts = await chrome.runtime.getContexts({ contextTypes: [chrome.runtime.ContextType.OFFSCREEN_DOCUMENT] });
@@ -87,7 +170,7 @@
               await ensureOffscreen();
               if (job.cancelled || queue.closed) continue;
               job.dispatched = true;
-              const result = await chrome.runtime.sendMessage({ type: "worker-job", jobId: job.jobId, key: `${tabId}:readings`, texts: job.texts, overrides: job.overrides });
+              const result = await chrome.runtime.sendMessage({ type: "worker-job", jobId: job.jobId, key: `${tabId}:readings`, texts: job.texts, overrides: job.overrides, includeWords: job.includeWords });
               if (!job.cancelled) job.respond(result);
             } catch (error) {
               if (!job.cancelled) job.respond({ error: String(error) });
@@ -128,7 +211,7 @@
           respond({ error: "Too many active frames. Try scrolling after other frames settle." });
           return;
         }
-        queue.jobs.push({ overrides: validOverrides(message.overrides), texts: message.texts, requestId: message.requestId, owner, jobId: crypto.randomUUID(), cancelled: false, dispatched: false, respond });
+        queue.jobs.push({ overrides: validOverrides(message.overrides), texts: message.texts, includeWords: message.includeWords === true, requestId: message.requestId, owner, jobId: crypto.randomUUID(), cancelled: false, dispatched: false, respond });
         if (!queue.running) void drain(tabId, queue);
         return true;
       });

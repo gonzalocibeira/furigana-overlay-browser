@@ -298,3 +298,63 @@ test('Docs pageless reading view starts automatically, ignores offscreen text, a
   await expect.poll(()=>readerEval(page,`function(){return this.querySelector('.empty')?.textContent}`)).toContain('Docs text is unavailable');
   await settings({docsReadingView:{enabled:false,spacing:2.8}});await page.close();
 });
+
+test('Docs word clicks show bilingual definitions, use lemmas, cache results, and handle failures and stale lookups',async()=>{
+  const lookups:string[]=[];
+  await context.route('https://*.wiktionary.org/w/api.php*',async route=>{
+    const url=new URL(route.request().url()),word=url.searchParams.get('page')!,ja=url.hostname.startsWith('ja.');
+    lookups.push(`${ja?'ja':'en'}:${word}`);
+    if(word==='未知') {await route.fulfill({json:{error:{code:'missingtitle'}}});return;}
+    if(word==='図書館' && ja) {await route.abort();return;}
+    if(word==='食べる')await new Promise(resolve=>setTimeout(resolve,500));
+    const language=ja?'日本語':'Japanese',pos=ja?'名詞':'Noun';
+    // Include other languages, nested examples, references, and untrusted markup.
+    const html=`<h2>Chinese</h2><h3>Noun</h3><ol><li>Wrong language</li></ol><div class="mw-heading mw-heading2"><h2 id="${language}">${language}</h2></div><div class="mw-heading mw-heading3"><h3>${pos}<span class="mw-editsection">[edit]</span></h3></div><ol><li>${ja?'学ぶための施設。':'A place for learning &amp; study.'}<a href="javascript:alert(1)"> safe text</a><img src="https://untrusted.example/tracker" onerror="alert(1)"><script>alert(1)</script><dl><dd>Hidden example</dd></dl><ul><li>Hidden quotation</li></ul></li></ol><h4>References</h4><ol><li>Wrong reference</li></ol><h2>Korean</h2><h3>Noun</h3><ol><li>Wrong language</li></ol>`;
+    await route.fulfill({json:{parse:{title:word,text:html}}});
+  });
+  await settings({docsReadingView:{enabled:true,spacing:2.8}});
+  const page=await context.newPage();
+  try {
+    await page.route('https://docs.google.com/document/d/definitions/edit',route=>route.fulfill({contentType:'text/html',body:`<!doctype html><meta charset="utf-8"><style>body{margin:0}.kix-appview-editor{position:absolute;top:100px;width:900px;height:600px}</style><div class="kix-appview-editor"><svg width="900" height="600"><g data-font-css="24px system-ui" fill="none"><rect x="40" y="60" width="540" height="28" aria-label="学校で食べました。図書館。未知。"/><rect x="40" y="120" width="540" height="28" aria-label="ありがとう。"/></g></svg></div>`}));
+    await page.goto('https://docs.google.com/document/d/definitions/edit');
+    await expect.poll(()=>readerEval(page,`function(){return this.querySelectorAll('.word').length}`),{timeout:30000}).toBeGreaterThan(0);
+    const before=await page.locator('.kix-appview-editor').innerHTML();
+    expect(lookups).toEqual([]);
+    expect(await readerEval(page,`function(){return this.querySelector('[data-surface="食べ"]')?.dataset.word}`)).toBe('食べる');
+    expect(await readerEval(page,`function(){return !!this.querySelector('[data-surface="ありがとう"]')}`)).toBe(true);
+    // A native keyboard click should work through the closed shadow root.
+    await readerEval(page,`function(){this.querySelector('[data-surface="学校"]').focus()}`);
+    await page.keyboard.press('Enter');
+    const snapshot=`function(){return {hidden:this.querySelector('.definition').hidden,text:this.querySelector('.definition').textContent,busy:this.querySelector('.definition-body')?.getAttribute('aria-busy'),selected:this.querySelector('.word[aria-pressed="true"]')?.dataset.surface,links:Array.from(this.querySelectorAll('.definition a'),a=>a.href),unsafe:this.querySelectorAll('.definition script,.definition img,.definition iframe').length}}`;
+    await expect.poll(async()=> (await readerEval(page,snapshot))?.text).toContain('A place for learning & study. safe text');
+    const result=await readerEval(page,snapshot);
+    expect(result.text).toContain('学ぶための施設。');expect(result.text).toContain('English');expect(result.text).toContain('日本語');
+    expect(result.text).not.toMatch(/Wrong|Hidden|alert/);expect(result.unsafe).toBe(0);expect(result.busy).toBe('false');expect(result.selected).toBe('学校');
+    expect(result.links).toEqual([`https://en.wiktionary.org/wiki/${encodeURIComponent('学校')}#Japanese`,`https://ja.wiktionary.org/wiki/${encodeURIComponent('学校')}#${encodeURIComponent('日本語')}`]);
+    expect(lookups.sort()).toEqual(['en:学校','ja:学校']);
+    await page.screenshot({path:test.info().outputPath('docs-word-definitions.png')});
+    await page.keyboard.press('Escape');expect((await readerEval(page,snapshot)).hidden).toBe(true);
+    expect(await readerEval(page,`function(){return this.activeElement?.dataset.surface}`)).toBe('学校');
+    const click=async(surface:string)=>readerEval(page,`function(){this.querySelector('[data-surface="${surface}"]').click()}`);
+    await click('学校');expect((await readerEval(page,snapshot)).text).toContain('A place for learning');expect(lookups).toHaveLength(2);
+    await click('食べ');await expect.poll(()=>lookups.includes('en:食べる')).toBe(true);
+    await click('学校');await page.waitForTimeout(650);expect((await readerEval(page,snapshot)).selected).toBe('学校');
+    await click('未知');await expect.poll(async()=> (await readerEval(page,snapshot))?.text).toContain('No English definition found');
+    expect((await readerEval(page,snapshot)).text).toContain('日本語の定義が見つかりません');
+    await click('図書館');await expect.poll(async()=> (await readerEval(page,snapshot))?.text).toContain('接続を確認');
+    expect((await readerEval(page,snapshot)).text).toContain('A place for learning');
+    const requestsBeforeRetry=lookups.length;
+    await click('図書館');await expect.poll(()=>lookups.length).toBeGreaterThan(requestsBeforeRetry);
+    await expect.poll(async()=> (await readerEval(page,snapshot))?.busy).toBe('false');
+    expect(await page.locator('.kix-appview-editor').innerHTML()).toBe(before);
+    await click('食べ');
+    await page.locator('rect').first().evaluate(el=>el.setAttribute('aria-label','先生です。'));
+    await expect.poll(async()=> (await readerEval(page,readerSnapshot))?.lines).toContain('先生です。');
+    expect((await readerEval(page,snapshot)).hidden).toBe(true);
+    await readerEval(page,`function(){this.querySelector('.header button').click()}`);
+    await expect(page.locator('fob-reading-view')).toHaveCount(0);
+  } finally {
+    await context.unroute('https://*.wiktionary.org/w/api.php*');
+    await settings({docsReadingView:{enabled:false,spacing:2.8}});await page.close();
+  }
+});

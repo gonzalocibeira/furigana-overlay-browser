@@ -1,4 +1,5 @@
 import {validOverrides} from './preferences';
+import './dictionary';
 let creating: Promise<void> | undefined;
 async function ensureOffscreen() {
   const contexts = await chrome.runtime.getContexts({contextTypes: [chrome.runtime.ContextType.OFFSCREEN_DOCUMENT]});
@@ -6,7 +7,7 @@ async function ensureOffscreen() {
   if (!creating) creating = chrome.offscreen.createDocument({url: 'offscreen.html', reasons: [chrome.offscreen.Reason.WORKERS], justification: 'Run the bundled offline Japanese tokenizer in a worker.'}).finally(() => { creating = undefined; });
   await creating;
 }
-interface Job { overrides:Record<string,string>; texts:string[]; requestId:string; owner:string; jobId:string; cancelled:boolean; dispatched:boolean; respond:(result:unknown)=>void }
+interface Job { overrides:Record<string,string>; texts:string[]; includeWords:boolean; requestId:string; owner:string; jobId:string; cancelled:boolean; dispatched:boolean; respond:(result:unknown)=>void }
 interface Queue { jobs:Job[]; running:boolean; closed:boolean; active?:Job }
 const queues = new Map<number, Queue>();
 function cancel(job:Job) {
@@ -24,7 +25,7 @@ async function drain(tabId: number, queue: Queue) {
         await ensureOffscreen();
         if(job.cancelled || queue.closed)continue;
         job.dispatched=true;
-        const result=await chrome.runtime.sendMessage({type:'worker-job',jobId:job.jobId,key:`${tabId}:readings`,texts:job.texts,overrides:job.overrides});
+        const result=await chrome.runtime.sendMessage({type:'worker-job',jobId:job.jobId,key:`${tabId}:readings`,texts:job.texts,overrides:job.overrides,includeWords:job.includeWords});
         if(!job.cancelled)job.respond(result);
       } catch (error) { if(!job.cancelled)job.respond({error:String(error)}); }
       finally {queue.active=undefined;}
@@ -53,7 +54,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
   queue.jobs=queue.jobs.filter(job=>!job.cancelled);
   if(queue.active?.owner===owner)cancel(queue.active);
   if (queue.jobs.length >= 32) { respond({error:'Too many active frames. Try scrolling after other frames settle.'}); return; }
-  queue.jobs.push({overrides:validOverrides(message.overrides),texts:message.texts,requestId:message.requestId,owner,jobId:crypto.randomUUID(),cancelled:false,dispatched:false,respond});
+  queue.jobs.push({overrides:validOverrides(message.overrides),texts:message.texts,includeWords:message.includeWords===true,requestId:message.requestId,owner,jobId:crypto.randomUUID(),cancelled:false,dispatched:false,respond});
   if (!queue.running) void drain(tabId,queue);
   return true;
 });

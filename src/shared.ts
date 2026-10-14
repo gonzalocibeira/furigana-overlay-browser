@@ -1,4 +1,5 @@
 export interface Reading { start: number; end: number; reading: string }
+export interface Word { start:number; end:number; lemma:string; reading:string }
 export const hiragana = (text: string) => text.replace(/[ァ-ヶ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60));
 const kanji = /[\p{Script=Han}々〆ヵヶ]/u;
 // Anchor kana runs in the dictionary reading. Ambiguous alignment stays whole-word.
