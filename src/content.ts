@@ -296,7 +296,7 @@ async function scan() {
         if (performance.now() - started >= pacer.budget()) { await frame(); started = performance.now(); if (version !== revision || !allowed()) return; }
         const next = iterator.next(); if (next.done) { done = true; break; }
         if (!next.value) continue;
-        if (!/[\p{Script=Han}々]/u.test(next.value.text)) continue;
+        if (!readingMode && !/[\p{Script=Han}々]/u.test(next.value.text)) continue;
         // Keep each batch under 2,000 characters without losing an oversized next item.
         if (length + next.value.text.length > 2000) {
           await process(batch); batch.length = 0; length = 0;
@@ -320,10 +320,11 @@ async function scan() {
       if (!batch.length || version !== revision || !allowed()) return;
       const requestId=crypto.randomUUID();activeRequest=requestId;
       let response:any;
-      try {response=await chrome.runtime.sendMessage({type:'tokenize',requestId,texts:batch.map(s=>s.text),overrides});}
+      try {response=await chrome.runtime.sendMessage({type:'tokenize',requestId,texts:batch.map(s=>s.text),overrides,includeWords:readingMode});}
       finally {if(activeRequest===requestId)activeRequest=undefined;}
       if (version !== revision || !allowed() || response?.cancelled) return;
       if (response?.error) throw new Error(response.error);
+      if(readingMode)for(let i=0;i<batch.length;i++) {const run=runMap.get(batch[i]);if(run)run.words=response.words?.[i] ?? [];}
       let started = performance.now();
       for (let i = 0; i < batch.length; i++) for (const part of response.results[i] as Reading[]) {
         if (attempted >= 500) return;

@@ -40,7 +40,7 @@
         if (message?.type !== "worker-job") return;
         const id = ++next;
         pending.set(id, { jobId: message.jobId, resolve: respond });
-        worker.postMessage({ id, key: message.key, texts: message.texts, overrides: message.overrides });
+        worker.postMessage({ id, key: message.key, texts: message.texts, overrides: message.overrides, includeWords: message.includeWords });
         return true;
       });
     }

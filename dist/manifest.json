@@ -50,7 +50,7 @@
     "https://*/*"
   ],
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'none'; connect-src 'self'; worker-src 'self'"
+    "extension_pages": "script-src 'self'; object-src 'none'; connect-src 'self' https://en.wiktionary.org https://ja.wiktionary.org; worker-src 'self'"
   },
   "icons": {
     "16": "icons/icon-16.png",

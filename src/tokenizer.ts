@@ -1,6 +1,6 @@
 import {readWithOverrides} from './preferences';
 import kuromoji from 'kuromoji';
-import { align, ReadingCache, type Reading } from './shared';
+import { align, hiragana, ReadingCache, type Reading, type Word } from './shared';
 const caches = new Map<string, ReadingCache>();
 const ready = new Promise<kuromoji.Tokenizer<kuromoji.IpadicFeatures>>((resolve, reject) => {
   kuromoji.builder({dicPath: new URL('dict/', self.location.href).href}).build((error, tokenizer) => error ? reject(error) : resolve(tokenizer));
@@ -20,14 +20,25 @@ async function run(data: any) {
     const tokenizer = await ready;
     let cache = caches.get(key); if (!cache) { cache = new ReadingCache(); caches.set(key, cache); }
     const results: Reading[][]=[];
+    const words: Word[][]=[];
     let started=performance.now();
     for(const text of texts as string[]) {
       if(cancelled.has(id))return;
+      const tokens=data.includeWords?tokenizer.tokenize(text):undefined;
+      if(tokens) {
+        let offset=0;const entries:Word[]=[];
+        for(const token of tokens) {
+          const start=text.indexOf(token.surface_form,offset);if(start<0)continue;
+          offset=start+token.surface_form.length;
+          if(/[\p{L}\p{N}]/u.test(token.surface_form))entries.push({start,end:offset,lemma:token.basic_form && token.basic_form!=='*'?token.basic_form:token.surface_form,reading:hiragana(token.reading ?? '')});
+        }
+        words.push(entries);
+      }
       const result=(text:string)=>{
       const hit = cache!.get(text); if (hit) return hit;
       const out: Reading[] = [];
       let offset = 0;
-      for (const token of tokenizer.tokenize(text)) {
+      for (const token of (text===texts[results.length] && tokens?tokens:tokenizer.tokenize(text))) {
         // Locate sequential surfaces rather than relying on code-point positions.
         const start = text.indexOf(token.surface_form, offset);
         if (start < 0) continue;
@@ -44,7 +55,7 @@ async function run(data: any) {
       if(performance.now()-started>=4) {await new Promise<void>(resolve=>setTimeout(resolve,0));started=performance.now();}
     }
     if(cancelled.has(id))return;
-    self.postMessage({id, results});
+    self.postMessage({id, results, ...(data.includeWords?{words}:{})});
   } catch (error) { self.postMessage({id, error:String(error)}); }
   finally {cancelled.delete(id);known.delete(id);}
 }

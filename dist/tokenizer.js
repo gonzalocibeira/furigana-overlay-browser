@@ -4651,15 +4651,28 @@
             caches.set(key, cache);
           }
           const results = [];
+          const words = [];
           let started = performance.now();
           for (const text of texts) {
             if (cancelled.has(id)) return;
+            const tokens = data.includeWords ? tokenizer.tokenize(text) : void 0;
+            if (tokens) {
+              let offset = 0;
+              const entries = [];
+              for (const token of tokens) {
+                const start = text.indexOf(token.surface_form, offset);
+                if (start < 0) continue;
+                offset = start + token.surface_form.length;
+                if (/[\p{L}\p{N}]/u.test(token.surface_form)) entries.push({ start, end: offset, lemma: token.basic_form && token.basic_form !== "*" ? token.basic_form : token.surface_form, reading: hiragana(token.reading ?? "") });
+              }
+              words.push(entries);
+            }
             const result = (text2) => {
               const hit = cache.get(text2);
               if (hit) return hit;
               const out = [];
               let offset = 0;
-              for (const token of tokenizer.tokenize(text2)) {
+              for (const token of text2 === texts[results.length] && tokens ? tokens : tokenizer.tokenize(text2)) {
                 const start = text2.indexOf(token.surface_form, offset);
                 if (start < 0) continue;
                 offset = start + token.surface_form.length;
@@ -4677,7 +4690,7 @@
             }
           }
           if (cancelled.has(id)) return;
-          self.postMessage({ id, results });
+          self.postMessage({ id, results, ...data.includeWords ? { words } : {} });
         } catch (error) {
           self.postMessage({ id, error: String(error) });
         } finally {
