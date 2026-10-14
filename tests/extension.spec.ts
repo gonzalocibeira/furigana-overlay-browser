@@ -243,6 +243,18 @@ test('popup handles long hostnames and expanded forms without horizontal overflo
   await expect(popup.locator('#corrections')).toContainText('にほんご');
   const dimensions=await popup.locator('body').evaluate(el=>({width:el.clientWidth,scrollWidth:el.scrollWidth,height:el.clientHeight,scrollHeight:el.scrollHeight}));
   expect(dimensions.width).toBe(380);expect(dimensions.scrollWidth).toBe(380);expect(dimensions.height).toBeLessThanOrEqual(580);expect(dimensions.scrollHeight).toBeGreaterThan(dimensions.height);
+  // Exercise wheel input in a popup-sized viewport: a body max-height alone
+  // propagates overflow to the root and can leave the native popup clipped.
+  await popup.mouse.move(350,400);await popup.mouse.wheel(0,10000);
+  await expect.poll(()=>popup.locator('body').evaluate(el=>el.scrollTop)).toBeGreaterThan(0);
+  const about=popup.getByRole('link',{name:'About Kō'});
+  await expect(about).toBeInViewport();
+  const [aboutPage]=await Promise.all([popup.waitForEvent('popup'),about.click()]);
+  await aboutPage.waitForLoadState();expect(aboutPage.url()).toBe(`chrome-extension://${extension}/about.html`);await aboutPage.close();
+  await popup.setViewportSize({width:380,height:400});await popup.mouse.move(350,300);await popup.mouse.wheel(0,10000);
+  await expect(about).toBeInViewport();
+  expect(await popup.locator('body').evaluate(el=>el.clientHeight)).toBeLessThanOrEqual(400);
+  await popup.setViewportSize({width:380,height:580});
   await popup.locator('#correction-search').focus();await expect(popup.locator('#correction-search')).toBeFocused();
   await popup.locator('#view-reading-panel summary').click();await popup.locator('#appearance-panel summary').click();
   await popup.locator('#correction-search').focus();
