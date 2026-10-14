@@ -23,8 +23,8 @@ async function page(language:DefinitionLanguage,word:string):Promise<DictionaryP
 }
 chrome.runtime.onMessage.addListener((message,sender,respond)=>{
   if(message?.type!=='define-word')return;
-  const url=sender.url?new URL(sender.url):undefined;
-  if(sender.tab?.id===undefined || url?.origin!=='https://docs.google.com' || !url.pathname.startsWith('/document/') || typeof message.word!=='string' || !/^[\p{L}\p{M}\p{N}々〆ー・\s'-]{1,80}$/u.test(message.word) || !message.word.trim()) {
+  let url:URL|undefined;try {url=sender.url?new URL(sender.url):undefined;}catch { /* Reject malformed senders below. */ }
+  if(sender.tab?.id===undefined || sender.frameId!==0 || !url || !['http:','https:'].includes(url.protocol) || typeof message.word!=='string' || !/^[\p{L}\p{M}\p{N}々〆ー・\s'-]{1,80}$/u.test(message.word) || !message.word.trim()) {
     respond({error:'Invalid dictionary request'});return;
   }
   const word=message.word.trim();let job=pending.get(word);

@@ -17,6 +17,89 @@
     }
   };
 
+  // src/shared.ts
+  var hiragana;
+  var init_shared = __esm({
+    "src/shared.ts"() {
+      "use strict";
+      hiragana = (text) => text.replace(/[ァ-ヶ]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 96));
+    }
+  });
+
+  // src/preferences.ts
+  function appearance(value) {
+    const v = value;
+    return { scale: typeof v?.scale === "number" && Number.isFinite(v.scale) ? Math.max(0.75, Math.min(1.5, v.scale)) : 1, contrast: v?.contrast === "high" ? "high" : "auto" };
+  }
+  function appearanceForSite(value, hostname) {
+    return appearance(value && typeof value === "object" ? value[hostname] : void 0);
+  }
+  function validateOverride(word, reading) {
+    word = word.trim().normalize("NFC");
+    reading = hiragana(reading.trim().normalize("NFKC"));
+    if (!word || word.length > 80 || !/[\p{Script=Han}々]/u.test(word) || /[\p{Cc}\p{Cf}]/u.test(word)) throw new Error("Enter a word containing kanji, up to 80 characters.");
+    if (!/^[ぁ-ゖーゝゞ]+$/u.test(reading) || reading.length > 80) throw new Error("Enter a reading in hiragana or katakana, up to 80 characters.");
+    return { word, reading };
+  }
+  function validOverrides(value) {
+    const entries = [];
+    if (value && typeof value === "object") for (const [word, raw] of Object.entries(value)) {
+      if (entries.length >= 200) break;
+      try {
+        if (typeof raw === "string") {
+          const v = validateOverride(word, raw);
+          entries.push([v.word, v.reading]);
+        }
+      } catch {
+      }
+    }
+    return Object.fromEntries(entries);
+  }
+  function docsReadingView(value) {
+    const v = value;
+    return { enabled: v?.enabled === true, spacing: typeof v?.spacing === "number" && Number.isFinite(v.spacing) ? Math.max(2.2, Math.min(3.4, v.spacing)) : 2.8 };
+  }
+  function readingViewPreferences(value, legacy) {
+    const v = value && typeof value === "object" && !Array.isArray(value) ? value : void 0;
+    const old = docsReadingView(legacy);
+    const sites = v?.sites && typeof v.sites === "object" && !Array.isArray(v.sites) ? Object.fromEntries(Object.entries(v.sites).filter(([, enabled]) => typeof enabled === "boolean")) : !v && old.enabled ? { "docs.google.com": true } : {};
+    return { sites, spacing: docsReadingView({ spacing: v?.spacing ?? old.spacing }).spacing, fontSize: panelFontSizes.includes(v?.fontSize ?? 0) ? v.fontSize : 20, width: typeof v?.width === "number" && Number.isFinite(v.width) ? Math.max(280, Math.min(720, v.width)) : 420 };
+  }
+  function panelEnabled(settings, hostname) {
+    return Object.hasOwn(settings.sites, hostname) && settings.sites[hostname] === true;
+  }
+  async function updateReadingView(patch, site) {
+    const state = await chrome.storage.local.get(["readingView", "docsReadingView"]);
+    const current = readingViewPreferences(state.readingView, state.docsReadingView);
+    const next = readingViewPreferences({ ...current, ...patch, sites: site ? { ...current.sites, [site.hostname]: site.enabled } : current.sites });
+    await chrome.storage.local.set({ readingView: next });
+    return next;
+  }
+  async function saveCorrection(word, reading, previousWord) {
+    const correction = validateOverride(word, reading);
+    const state = await chrome.storage.local.get({ readingOverrides: {} }), values = validOverrides(state.readingOverrides);
+    if (previousWord && previousWord !== correction.word) delete values[previousWord];
+    if (!Object.hasOwn(values, correction.word) && Object.keys(values).length >= 200) throw new Error("You have 200 corrections. Remove one before adding another.");
+    values[correction.word] = correction.reading;
+    await chrome.storage.local.set({ readingOverrides: values });
+    return values;
+  }
+  async function removeCorrection(word) {
+    const state = await chrome.storage.local.get({ readingOverrides: {} }), values = validOverrides(state.readingOverrides);
+    delete values[word];
+    await chrome.storage.local.set({ readingOverrides: values });
+    return values;
+  }
+  var panelFontSizes, correctionBackupLimit;
+  var init_preferences = __esm({
+    "src/preferences.ts"() {
+      "use strict";
+      init_shared();
+      panelFontSizes = [16, 18, 20, 24, 28, 32];
+      correctionBackupLimit = 256 * 1024;
+    }
+  });
+
   // src/definitions.ts
   function dictionaryURL(language, word) {
     return `https://${language}.wiktionary.org/wiki/${encodeURIComponent(word)}#${language === "en" ? "Japanese" : "\u65E5\u672C\u8A9E"}`;
@@ -87,6 +170,7 @@
   var init_reading_panel = __esm({
     "src/reading-panel.ts"() {
       "use strict";
+      init_preferences();
       init_definitions();
       ReadingPanel = class {
         host = document.createElement("fob-reading-view");
@@ -100,11 +184,51 @@
         lookupVersion = 0;
         selected;
         definitions = /* @__PURE__ */ new Map();
-        constructor(close) {
+        overrides = {};
+        resizeHandle;
+        resizeStart;
+        width = 420;
+        saveWidth;
+        setOverrides(values) {
+          this.overrides = values;
+        }
+        constructor(close, saveWidth) {
+          this.saveWidth = saveWidth;
           this.root.innerHTML = `<style>
-:host{all:initial!important;position:fixed!important;right:12px!important;top:var(--reader-top,100px)!important;bottom:12px!important;width:min(420px,calc(100vw - 24px))!important;z-index:2147483647!important;display:block!important;contain:layout style!important;color-scheme:light!important}*{box-sizing:border-box}.reader{height:100%;display:flex;flex-direction:column;background:#fffdf7;color:#193f3c;border:1px solid #cbd8ce;border-radius:16px;box-shadow:0 8px 36px #193f3c26;overflow:hidden;font:13px/1.5 system-ui,sans-serif}.reader.high{color:#101010;background:#fff}.header{display:flex;align-items:center;gap:12px;padding:16px 18px;border-bottom:1px solid #dfe7e0}h2{font:700 16px/1.3 system-ui;margin:0}small{display:block;color:#647572;font-size:11px;margin-top:3px}button{margin-left:auto;flex:none;background:transparent;border:1px solid #cbd8ce;border-radius:8px;color:inherit;cursor:pointer;padding:6px 9px;font:600 12px system-ui}button:focus-visible,.content:focus-visible{outline:2px solid #c28637;outline-offset:-3px}.content{padding:18px 22px 28px;overflow:auto;overscroll-behavior:contain;flex:1;min-height:0;font:20px system-ui,sans-serif;user-select:text}.line{margin:0;line-height:var(--reader-spacing,2.8);white-space:pre-wrap;overflow-wrap:anywhere}ruby{ruby-position:over;ruby-align:center}rt{font:var(--reader-ruby,.5em)/1 system-ui,sans-serif}.empty{font:13px/1.6 system-ui;color:#647572}.status{margin:0;padding:10px 18px;border-top:1px solid #dfe7e0;color:#647572;font-size:11px}@media print{:host{display:none!important}}
+:host{all:initial!important;position:fixed!important;right:12px!important;top:var(--reader-top,100px)!important;bottom:12px!important;width:min(var(--reader-width,420px),calc(100vw - 24px))!important;z-index:2147483647!important;display:block!important;contain:layout style!important;color-scheme:light!important}*{box-sizing:border-box}.reader{height:100%;display:flex;flex-direction:column;background:#fffdf7;color:#193f3c;border:1px solid #cbd8ce;border-radius:16px;box-shadow:0 8px 36px #193f3c26;overflow:hidden;font:13px/1.5 system-ui,sans-serif}.reader.high{color:#101010;background:#fff}.header{display:flex;align-items:center;gap:12px;padding:16px 18px;border-bottom:1px solid #dfe7e0}h2{font:700 16px/1.3 system-ui;margin:0}small{display:block;color:#647572;font-size:11px;margin-top:3px}button{margin-left:auto;flex:none;background:transparent;border:1px solid #cbd8ce;border-radius:8px;color:inherit;cursor:pointer;padding:6px 9px;font:600 12px system-ui}button:focus-visible,.content:focus-visible{outline:2px solid #c28637;outline-offset:-3px}.content{padding:18px 22px 28px;overflow:auto;overscroll-behavior:contain;flex:1;min-height:0;font:var(--reader-font,20px) system-ui,sans-serif;user-select:text}.line{margin:0;line-height:var(--reader-spacing,2.8);white-space:pre-wrap;overflow-wrap:anywhere}ruby{ruby-position:over;ruby-align:center}rt{font:var(--reader-ruby,.5em)/1 system-ui,sans-serif}.empty{font:13px/1.6 system-ui;color:#647572}.status{margin:0;padding:10px 18px;border-top:1px solid #dfe7e0;color:#647572;font-size:11px}@media print{:host{display:none!important}}
 .word{display:inline;margin:0;padding:0;border:0;border-radius:3px;font:inherit;line-height:inherit;color:inherit;white-space:inherit;user-select:text}.word:hover,.word[aria-pressed=true]{background:#e4ebde;text-decoration:underline;text-decoration-color:#b18a46;text-underline-offset:5px}.word:focus-visible{outline-offset:2px}.definition[hidden]{display:none}.definition{flex:none;max-height:44%;overflow:auto;padding:14px 18px;border-top:1px solid #cbd8ce;background:#f3f6ee}.high .definition{background:#fff}.definition header{display:flex;align-items:center;gap:8px}.definition h3{font-size:18px;margin:0;overflow-wrap:anywhere}.definition h4{margin:12px 0 4px;font-size:12px}.definition p{margin:4px 0;overflow-wrap:anywhere}.definition ol{margin:4px 0;padding-left:20px}.definition a{color:inherit;text-underline-offset:2px}.definition .source{font-size:10px;color:#647572}.definition .pronunciation{font-size:12px;color:#647572}.definition .feedback{font-size:12px;color:#647572}
-</style><section class="reader" role="region" aria-label="Furigana reading view"><header class="header"><div><h2>Reading view</h2><small>Click a word for English / \u65E5\u672C\u8A9E definitions online</small></div><button type="button" aria-label="Close reading view">Close</button></header><div class="content" tabindex="0" aria-label="Document reading text" lang="ja"></div><section class="definition" aria-label="Word definition" aria-live="polite" hidden></section><p class="status" role="status" aria-live="polite"></p></section>`;
+
+[hidden]{display:none!important}.resize{position:absolute;left:-5px;top:16px;bottom:16px;width:10px;cursor:ew-resize;touch-action:none;border-radius:8px}.resize:hover,.resize:focus-visible{background:#206b5c55;outline:2px solid #206b5c}.correction-form{margin-top:10px;padding-top:10px;border-top:1px solid #cbd8ce}.correction-form label{display:block;font-size:11px;margin:6px 0}.correction-form input{display:block;width:100%;font:14px system-ui;padding:6px;border:1px solid #cbd8ce;border-radius:6px}.correction-actions{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.correction-actions button{margin:0;font-size:11px}.feedback[data-error=true]{color:#9c3c2d}input:focus-visible{outline:2px solid #c28637;outline-offset:2px}
+</style><div class="resize" role="separator" tabindex="0" aria-label="Reading panel width" aria-orientation="vertical" aria-valuemin="280" aria-valuemax="720" aria-valuenow="420"></div><section class="reader" role="region" aria-label="Furigana reading view"><header class="header"><div><h2>Reading view</h2><small>Click a word for English / \u65E5\u672C\u8A9E definitions online</small></div><button type="button" aria-label="Close reading view">Close</button></header><div class="content" tabindex="0" aria-label="Page reading text" lang="ja"></div><section class="definition" aria-label="Word definition" aria-live="polite" hidden></section><p class="status" role="status" aria-live="polite"></p></section>`;
+          this.resizeHandle = this.root.querySelector(".resize");
+          const finish = () => {
+            if (!this.resizeStart) return;
+            this.resizeStart = void 0;
+            void this.persistWidth();
+          };
+          this.resizeHandle.addEventListener("pointerdown", (event) => {
+            if (event.button !== 0) return;
+            event.preventDefault();
+            this.resizeStart = { x: event.clientX, width: this.host.getBoundingClientRect().width };
+            this.resizeHandle.setPointerCapture(event.pointerId);
+          });
+          this.resizeHandle.addEventListener("pointermove", (event) => {
+            if (this.resizeStart) this.setWidth(this.resizeStart.width + this.resizeStart.x - event.clientX);
+          });
+          this.resizeHandle.addEventListener("pointerup", finish);
+          this.resizeHandle.addEventListener("pointercancel", finish);
+          this.resizeHandle.addEventListener("lostpointercapture", finish);
+          this.resizeHandle.addEventListener("keydown", (event) => {
+            let width = this.width;
+            if (event.key === "ArrowLeft") width += 10;
+            else if (event.key === "ArrowRight") width -= 10;
+            else if (event.key === "Home") width = 280;
+            else if (event.key === "End") width = 720;
+            else return;
+            event.preventDefault();
+            this.setWidth(width);
+            void this.persistWidth();
+          });
           this.content = this.root.querySelector(".content");
           this.status = this.root.querySelector(".status");
           this.definition = this.root.querySelector(".definition");
@@ -120,6 +244,30 @@
               this.dismissDefinition(true);
             }
           });
+        }
+        setWidth(value) {
+          this.width = Math.max(Math.min(280, innerWidth - 24), Math.min(720, innerWidth - 24, value));
+          this.host.style.setProperty("--reader-width", `${this.width}px`);
+          this.resizeHandle.setAttribute("aria-valuemin", String(Math.min(280, innerWidth - 24)));
+          this.resizeHandle.setAttribute("aria-valuemax", String(Math.min(720, innerWidth - 24)));
+          this.resizeHandle.setAttribute("aria-valuenow", String(Math.round(this.width)));
+        }
+        async persistWidth() {
+          try {
+            await this.saveWidth(Math.max(280, this.width));
+          } catch {
+            this.status.textContent = "Could not save the panel width. Try resizing again.";
+          }
+        }
+        appearance(settings, appearance2) {
+          if (!this.resizeStart) this.setWidth(settings.width);
+          this.host.style.setProperty("--reader-font", `${settings.fontSize}px`);
+          this.host.style.setProperty("--reader-spacing", String(settings.spacing));
+          this.host.style.setProperty("--reader-ruby", `${0.5 * appearance2.scale}em`);
+          this.root.querySelector(".reader").classList.toggle("high", appearance2.contrast === "high");
+        }
+        ownsNode(node) {
+          return node === this.host || this.host.contains(node);
         }
         owns(event) {
           return event.composedPath().includes(this.host);
@@ -141,15 +289,13 @@
           p.className = "empty";
           p.textContent = text;
           this.content.replaceChildren(p);
-          this.status.textContent = "Only the active page\u2019s visible text is processed.";
+          this.status.textContent = "Only visible page text is processed.";
         }
         display(runs, context, settings, appearance2, top, limited) {
           this.host.style.setProperty("--reader-top", `${Math.max(12, Math.min(top, innerHeight - 180))}px`);
-          this.host.style.setProperty("--reader-spacing", String(settings.spacing));
-          this.host.style.setProperty("--reader-ruby", `${0.5 * appearance2.scale}em`);
-          this.root.querySelector(".reader").classList.toggle("high", appearance2.contrast === "high");
-          const lines = readingLines(runs), rendered = JSON.stringify([context, lines]);
-          const status = `${context === "pageless" ? "Visible document text" : "Active page \xB7 visible text"} \xB7 Text-only view${limited ? " \xB7 View limit reached" : ""}.`;
+          this.appearance(settings, appearance2);
+          const lines = context === "web" ? runs.map((run) => ({ text: run.text, readings: run.readings, words: run.words })) : readingLines(runs), rendered = JSON.stringify([context, lines]);
+          const status = `${context === "web" ? "Visible webpage text" : context === "pageless" ? "Visible document text" : "Active page \xB7 visible text"} \xB7 Text-only view${limited ? " \xB7 View limit reached" : ""}.`;
           if (this.status.textContent !== status) this.status.textContent = status;
           if (rendered === this.rendered) return;
           if (this.rendered !== void 0) this.scrollTop = this.content.scrollTop;
@@ -195,9 +341,18 @@
               button.type = "button";
               button.className = "word";
               const surface = line.text.slice(word.start, word.end);
+              let pronunciation = "", position = word.start, unknown = false;
+              for (const part of line.readings) {
+                if (part.start < position || part.end > word.end) continue;
+                pronunciation += line.text.slice(position, part.start) + part.reading;
+                position = part.end;
+                if (!part.reading) unknown = true;
+              }
+              pronunciation += line.text.slice(position, word.end);
+              if (unknown || /[\p{Script=Han}々]/u.test(pronunciation)) pronunciation = word.reading === "*" ? "" : word.reading;
               button.dataset.word = word.lemma;
               button.dataset.surface = surface;
-              button.dataset.reading = word.reading;
+              button.dataset.reading = pronunciation;
               button.setAttribute("aria-label", `Define ${surface} in English and Japanese`);
               button.setAttribute("aria-pressed", "false");
               button.title = `${surface} \xB7 English / \u65E5\u672C\u8A9E definitions`;
@@ -229,6 +384,93 @@
           if (focus) this.selected?.focus();
           this.selected = void 0;
         }
+        correctionControls(surface, reading) {
+          const toggle = document.createElement("button");
+          toggle.type = "button";
+          toggle.textContent = "Correct reading";
+          toggle.style.margin = "8px 0 0";
+          const form = document.createElement("form");
+          form.className = "correction-form";
+          form.hidden = true;
+          const wordLabel = document.createElement("label");
+          wordLabel.textContent = "Word or name";
+          const word = document.createElement("input");
+          word.value = surface;
+          word.maxLength = 80;
+          word.required = true;
+          word.autocomplete = "off";
+          wordLabel.append(word);
+          const readingLabel = document.createElement("label");
+          readingLabel.textContent = "Reading";
+          const kana = document.createElement("input");
+          kana.value = reading;
+          kana.maxLength = 80;
+          kana.required = true;
+          kana.autocomplete = "off";
+          readingLabel.append(kana);
+          const actions = document.createElement("div");
+          actions.className = "correction-actions";
+          const save = document.createElement("button");
+          save.type = "submit";
+          save.textContent = "Save correction";
+          const restore = document.createElement("button");
+          restore.type = "button";
+          restore.textContent = "Restore automatic reading";
+          const cancel = document.createElement("button");
+          cancel.type = "button";
+          cancel.textContent = "Cancel";
+          const feedback = document.createElement("p");
+          feedback.className = "feedback";
+          feedback.setAttribute("role", "status");
+          const report = (text, error = false) => {
+            feedback.textContent = text;
+            feedback.dataset.error = String(error);
+          };
+          const sync = () => {
+            restore.hidden = !Object.hasOwn(this.overrides, word.value.trim().normalize("NFC"));
+          };
+          sync();
+          word.oninput = sync;
+          toggle.onclick = () => {
+            form.hidden = !form.hidden;
+            toggle.setAttribute("aria-expanded", String(!form.hidden));
+            if (!form.hidden) kana.focus();
+          };
+          toggle.setAttribute("aria-expanded", "false");
+          cancel.onclick = () => {
+            form.hidden = true;
+            toggle.setAttribute("aria-expanded", "false");
+            toggle.focus();
+          };
+          form.onsubmit = async (event) => {
+            event.preventDefault();
+            save.disabled = true;
+            try {
+              this.overrides = await saveCorrection(word.value, kana.value);
+              report("Saved. Readings update automatically.");
+              sync();
+            } catch (error) {
+              report(error instanceof Error ? error.message : "Could not save. Try again.", true);
+            } finally {
+              save.disabled = false;
+            }
+          };
+          restore.onclick = async () => {
+            restore.disabled = true;
+            try {
+              this.overrides = await removeCorrection(word.value.trim().normalize("NFC"));
+              report("Automatic reading restored.");
+              sync();
+            } catch {
+              report("Could not restore the reading. Try again.", true);
+            } finally {
+              restore.disabled = false;
+            }
+          };
+          actions.append(save, restore, cancel);
+          form.append(wordLabel, readingLabel, actions, feedback);
+          this.definition.append(toggle, form);
+        }
         async define(button) {
           this.dismissDefinition();
           const version = this.lookupVersion;
@@ -251,6 +493,7 @@
           pronunciation.lang = "ja";
           pronunciation.textContent = [button.dataset.reading, word !== surface ? `\u8F9E\u66F8\u5F62: ${word}` : ""].filter(Boolean).join(" \xB7 ");
           this.definition.append(pronunciation);
+          if (/[\p{Script=Han}々]/u.test(surface)) this.correctionControls(surface, button.dataset.reading ?? "");
           const body = document.createElement("div");
           body.className = "definition-body";
           body.setAttribute("aria-busy", "true");
@@ -312,55 +555,6 @@
           body.append(notice);
         }
       };
-    }
-  });
-
-  // src/shared.ts
-  var hiragana;
-  var init_shared = __esm({
-    "src/shared.ts"() {
-      "use strict";
-      hiragana = (text) => text.replace(/[ァ-ヶ]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 96));
-    }
-  });
-
-  // src/preferences.ts
-  function appearance(value) {
-    const v = value;
-    return { scale: typeof v?.scale === "number" && Number.isFinite(v.scale) ? Math.max(0.75, Math.min(1.5, v.scale)) : 1, contrast: v?.contrast === "high" ? "high" : "auto" };
-  }
-  function appearanceForSite(value, hostname) {
-    return appearance(value && typeof value === "object" ? value[hostname] : void 0);
-  }
-  function validateOverride(word, reading) {
-    word = word.trim().normalize("NFC");
-    reading = hiragana(reading.trim().normalize("NFKC"));
-    if (!word || word.length > 80 || !/[\p{Script=Han}々]/u.test(word) || /[\p{Cc}\p{Cf}]/u.test(word)) throw new Error("Enter a word containing kanji, up to 80 characters.");
-    if (!/^[ぁ-ゖーゝゞ]+$/u.test(reading) || reading.length > 80) throw new Error("Enter a reading in hiragana or katakana, up to 80 characters.");
-    return { word, reading };
-  }
-  function validOverrides(value) {
-    const entries = [];
-    if (value && typeof value === "object") for (const [word, raw] of Object.entries(value)) {
-      if (entries.length >= 200) break;
-      try {
-        if (typeof raw === "string") {
-          const v = validateOverride(word, raw);
-          entries.push([v.word, v.reading]);
-        }
-      } catch {
-      }
-    }
-    return Object.fromEntries(entries);
-  }
-  function docsReadingView(value) {
-    const v = value;
-    return { enabled: v?.enabled === true, spacing: typeof v?.spacing === "number" && Number.isFinite(v.spacing) ? Math.max(2.2, Math.min(3.4, v.spacing)) : 2.8 };
-  }
-  var init_preferences = __esm({
-    "src/preferences.ts"() {
-      "use strict";
-      init_shared();
     }
   });
 
@@ -449,10 +643,20 @@
       var statusState = "loading";
       var readingAppearance = appearance(void 0);
       var overrides = {};
-      var viewSettings = docsReadingView(void 0);
-      var reader = docs ? new ReadingPanel(() => {
-        void chrome.storage.local.set({ docsReadingView: { ...viewSettings, enabled: false } });
-      }) : void 0;
+      var legacyView;
+      var rawView;
+      var viewSettings = readingViewPreferences(void 0);
+      var topFrame = window === window.top;
+      var readingModeEnabled = () => topFrame && panelEnabled(viewSettings, hostname);
+      var reader;
+      function ensureReader() {
+        if (reader || !readingModeEnabled()) return;
+        reader = new ReadingPanel(() => {
+          void updateReadingView({}, { hostname, enabled: false }).catch(() => reader?.unavailable("Could not close the reading view. Try again."));
+        }, (width) => updateReadingView({ width }));
+        reader.setOverrides(overrides);
+        reader.appearance(viewSettings, readingAppearance);
+      }
       var activeRequest;
       var pacer = new AdaptivePacer();
       var nextScanAt = 0;
@@ -461,15 +665,19 @@
       function watchInput(target) {
         if (inputDocuments.has(target)) return;
         inputDocuments.add(target);
-        target.addEventListener("compositionstart", () => {
+        target.addEventListener("compositionstart", (event) => {
+          if (reader?.owns(event)) return;
           composing = true;
           schedule();
         }, true);
-        target.addEventListener("compositionend", () => {
+        target.addEventListener("compositionend", (event) => {
+          if (reader?.owns(event)) return;
           composing = false;
           schedule();
         }, true);
-        target.addEventListener("input", () => schedule(150, "edit"), true);
+        target.addEventListener("input", (event) => {
+          if (!reader?.owns(event)) schedule(150, "edit");
+        }, true);
       }
       function watchDocsInputs(root) {
         const frames = [...root.querySelectorAll("iframe.docs-texteventtarget-iframe")];
@@ -500,6 +708,7 @@
         layer.replaceChildren();
       }
       function schedule(delay = 150, activity) {
+        ensureReader();
         revision++;
         clear();
         window.clearTimeout(timer);
@@ -509,10 +718,10 @@
           activeRequest = void 0;
         }
         if (activity) delay = pacer.mark(activity);
-        if (docs && viewSettings.enabled && delay > 0) delay = Math.max(400, delay);
+        if (readingModeEnabled() && delay > 0) delay = Math.max(400, delay);
         statusState = allowed() ? "loading" : "paused";
         message = !enabled || excluded.includes(hostname) ? "Readings are paused for this page." : document.hidden ? "Paused while this tab is in the background." : composing ? "Waiting for text composition to finish." : activity === "scroll" ? "Waiting for scrolling to settle\u2026" : activity === "edit" ? "Waiting for editing to settle\u2026" : "Updating visible readings\u2026";
-        reader?.loading(viewSettings.enabled && enabled && !excluded.includes(hostname) && !document.hidden, message, allowed());
+        reader?.loading(readingModeEnabled() && enabled && !excluded.includes(hostname) && !document.hidden, message, allowed());
         if (allowed()) {
           nextScanAt = performance.now() + delay;
           timer = window.setTimeout(() => {
@@ -573,6 +782,7 @@
           text,
           block,
           identity: node,
+          sourceOffset: offset,
           fontSize: parseFloat(style.fontSize),
           color: style.color,
           background: style.backgroundColor,
@@ -585,6 +795,44 @@
             return rects.length === 1 && visible(rects[0]) ? rects[0] : void 0;
           }
         };
+      }
+      function* visibleTextSources(node) {
+        const base = textSource(node);
+        if (!base) return;
+        const origin = base.sourceOffset ?? 0, range = document.createRange();
+        const pending = [[0, base.text.length]], parts = [];
+        while (pending.length) {
+          const [start2, end] = pending.pop();
+          range.setStart(node, origin + start2);
+          range.setEnd(node, origin + end);
+          const rects = [...range.getClientRects()].filter((rect) => rect.width > 0 && rect.height > 0);
+          yield void 0;
+          const shown = rects.filter(visible);
+          if (!shown.length) continue;
+          if (shown.length === rects.length || end - start2 <= 1) {
+            parts.push({ start: start2, end, box: range.getBoundingClientRect() });
+            continue;
+          }
+          let mid = start2 + Math.floor((end - start2) / 2);
+          if (mid > start2 && /[\uDC00-\uDFFF]/.test(base.text[mid])) mid--;
+          if (mid === start2) mid = Math.min(end, start2 + 2);
+          if (mid === end) {
+            parts.push({ start: start2, end, box: range.getBoundingClientRect() });
+            continue;
+          }
+          pending.push([mid, end], [start2, mid]);
+        }
+        const merged = [];
+        for (const part of parts) {
+          const previous = merged.at(-1);
+          if (previous?.end === part.start) previous.end = part.end;
+          else merged.push({ ...part });
+        }
+        for (const part of merged) {
+          const text = base.text.slice(part.start, part.end);
+          if (!text.trim()) continue;
+          yield { ...base, text, sourceOffset: origin + part.start, orderBox: part.box, rect: () => part.box };
+        }
       }
       var measure = document.createElement("canvas").getContext("2d");
       function docsSource(element) {
@@ -637,13 +885,13 @@
           return visible(result) ? result : void 0;
         } };
       }
-      function* sources(root) {
+      function* sources(root, panelMode = false) {
         let node = root;
         while (node) {
           let descend = true;
           let source;
           if (node instanceof Element) {
-            if (node === host || node.matches('script,style,noscript,ruby,rt,input,textarea,select,[contenteditable]:not([contenteditable="false"])')) descend = false;
+            if (node === host || reader?.ownsNode(node) || node.matches('script,style,noscript,ruby,rt,input,textarea,select,[contenteditable]:not([contenteditable="false"])')) descend = false;
             else if (node !== root) {
               const r = node.getBoundingClientRect();
               const style = getComputedStyle(node);
@@ -655,9 +903,12 @@
             }
             if (descend && !docs && node.shadowRoot) {
               observeShadow(node.shadowRoot);
-              yield* sources(node.shadowRoot);
+              yield* sources(node.shadowRoot, panelMode);
             }
-          } else if (!docs && node instanceof Text && node.parentElement) source = textSource(node);
+          } else if (!docs && node instanceof Text && node.parentElement) {
+            if (panelMode) yield* visibleTextSources(node);
+            else source = textSource(node);
+          }
           yield source;
           if (descend && node.firstChild) {
             node = node.firstChild;
@@ -668,12 +919,12 @@
           node = node.nextSibling;
         }
       }
-      function* webSources() {
-        const seeds = /* @__PURE__ */ new Set(), seen = /* @__PURE__ */ new Set();
+      function* webSources(panelMode = false) {
+        const seeds = /* @__PURE__ */ new Set(), seen = /* @__PURE__ */ new Map();
         let inspected = 0;
         const dx = Math.max(64, Math.ceil(innerWidth / 16)), dy = Math.max(16, Math.ceil(innerHeight / 100));
         for (let y = 4; y < innerHeight; y += dy) for (let x = 4; x < innerWidth; x += dx) {
-          let element = document.elementFromPoint(x, y);
+          let element = panelMode ? document.elementsFromPoint(x, y).find((element2) => element2 !== host && !reader?.ownsNode(element2)) ?? null : document.elementFromPoint(x, y);
           while (element?.shadowRoot) {
             observeShadow(element.shadowRoot);
             const inner = element.shadowRoot.elementFromPoint(x, y);
@@ -685,14 +936,20 @@
           if (element.closest('ruby,rt,input,textarea,select,[contenteditable]:not([contenteditable="false"])')) continue;
           seeds.add(element);
           let local = 0;
-          for (const source of sources(element)) {
+          for (const source of sources(element, panelMode)) {
             if (++local > 128 || ++inspected > 4096) break;
             if (source?.identity) {
-              if (seen.has(source.identity)) {
+              let offsets = seen.get(source.identity);
+              if (!offsets) {
+                offsets = /* @__PURE__ */ new Set();
+                seen.set(source.identity, offsets);
+              }
+              const offset = source.sourceOffset ?? 0;
+              if (offsets.has(offset)) {
                 yield void 0;
                 continue;
               }
-              seen.add(source.identity);
+              offsets.add(offset);
             }
             yield source;
           }
@@ -743,7 +1000,7 @@
         running = true;
         const version = revision;
         let count = 0, attempted = 0, found = false, skippedSpace = 0, unknown = 0;
-        const readingMode = docs && viewSettings.enabled;
+        const readingMode = readingModeEnabled();
         const readingRuns = [];
         const runMap = /* @__PURE__ */ new Map();
         let panelCharacters = 0, panelLimited = false;
@@ -814,6 +1071,83 @@
               if (prepared.length >= 2e3) break;
             }
           }
+          if (readingMode && !docs) {
+            prepared = [];
+            let started = performance.now();
+            const discovered = [];
+            for (const source of webSources(true)) {
+              if (performance.now() - started >= pacer.budget()) {
+                await frame();
+                started = performance.now();
+                if (version !== revision || !allowed()) return;
+              }
+              if (!source) continue;
+              discovered.push(source);
+              if (discovered.length >= 2e3) {
+                panelLimited = true;
+                break;
+              }
+            }
+            const paths = /* @__PURE__ */ new Map();
+            const path = (node) => {
+              let result = paths.get(node);
+              if (result) return result;
+              result = [];
+              let current = node;
+              while (current) {
+                result.unshift(current);
+                current = current instanceof ShadowRoot ? current.host : current.parentNode;
+              }
+              paths.set(node, result);
+              return result;
+            };
+            discovered.sort((a, b) => {
+              if (a.identity === b.identity) return (a.sourceOffset ?? 0) - (b.sourceOffset ?? 0);
+              const first = path(a.identity), second = path(b.identity);
+              let i = 0;
+              while (i < first.length && i < second.length && first[i] === second[i]) i++;
+              if (i === first.length) return -1;
+              if (i === second.length) return 1;
+              const order = first[i].compareDocumentPosition(second[i]);
+              return order & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : order & Node.DOCUMENT_POSITION_PRECEDING ? 1 : 0;
+            });
+            let previousSource;
+            for (const source of discovered) {
+              if (panelCharacters + source.text.length > 16e3) {
+                panelLimited = true;
+                break;
+              }
+              panelCharacters += source.text.length;
+              const previous = prepared.at(-1);
+              if (previous && previous.block === source.block && previous.text.length + source.text.length < 2e3) {
+                const contiguous = !previousSource || previousSource.identity !== source.identity || (previousSource.sourceOffset ?? 0) + previousSource.text.length === source.sourceOffset;
+                let hardBreak = false, node = previousSource?.identity ?? null, steps = 0;
+                if (node?.getRootNode() === source.identity?.getRootNode() && node !== source.identity) while (node && node !== source.identity && steps++ < 32) {
+                  if (node.firstChild) node = node.firstChild;
+                  else {
+                    while (node && !node.nextSibling && node !== source.block) node = node.parentNode;
+                    node = node === source.block ? null : node?.nextSibling ?? null;
+                  }
+                  if (node instanceof HTMLBRElement) hardBreak = true;
+                }
+                if (!contiguous || hardBreak) {
+                  if (++panelCharacters > 16e3) {
+                    panelLimited = true;
+                    break;
+                  }
+                  previous.text += "\n";
+                }
+                previous.text += source.text;
+              } else prepared.push({ ...source });
+              previousSource = source;
+            }
+            for (const source of prepared) {
+              const box = source.orderBox;
+              const run = { text: source.text, top: box.top, left: box.left, right: box.right, readings: [] };
+              readingRuns.push(run);
+              runMap.set(source, run);
+            }
+          }
           const iterator = readingMode ? prepared[Symbol.iterator]() : groupedSources(root, prepared);
           let done = false;
           while (!done && attempted < 500 && version === revision && allowed()) {
@@ -853,9 +1187,9 @@
             if (readingMode) reader?.unavailable(message);
           } else if (!found) message = "No visible kanji in this view.";
           else message = `Active \u2014 ${layer.childElementCount} visible readings${docs ? activePage ? " on the active page" : " in the editor viewport" : ""}.${skippedSpace ? ` Tight spacing: ${skippedSpace} omitted.` : ""}${unknown ? ` Unknown words: ${unknown}. Add a local correction in the menu.` : ""}${attempted >= 500 ? " View limit reached; scroll to reveal more." : ""}`;
-          if (readingMode && prepared?.length) {
-            reader?.display(readingRuns, activePage ? String([...pages].indexOf(activePage)) : "pageless", viewSettings, readingAppearance, editorClip?.top ?? 100, panelLimited || attempted >= 500);
-            message = `Reading view \u2014 ${count} readings in ${activePage ? "the active page\u2019s visible text" : "the editor viewport"}.${unknown ? ` Unknown words: ${unknown}. Add a local correction in the menu.` : ""}${panelLimited || attempted >= 500 ? " View limit reached; scroll to reveal more." : ""}`;
+          if (readingMode && (!docs || prepared?.length)) {
+            reader?.display(readingRuns, !docs ? "web" : activePage ? String([...pages].indexOf(activePage)) : "pageless", viewSettings, readingAppearance, (docs ? editorClip?.top : 12) ?? 100, panelLimited || attempted >= 500);
+            message = `Reading view \u2014 ${count} readings in ${!docs ? "the visible webpage text" : activePage ? "the active page\u2019s visible text" : "the editor viewport"}.${unknown ? ` Unknown words: ${unknown}. Add a local correction in the menu.` : ""}${panelLimited || attempted >= 500 ? " View limit reached; scroll to reveal more." : ""}`;
           }
           async function process(batch) {
             if (!batch.length || version !== revision || !allowed()) return;
@@ -972,21 +1306,35 @@
         if (request?.type === "status") respond({ message, state: statusState });
       });
       chrome.storage.onChanged.addListener((changes, area) => {
-        if (area !== "local" || !["enabled", "excluded", "siteAppearance", "readingOverrides", "docsReadingView"].some((key) => key in changes)) return;
+        if (area !== "local" || !["enabled", "excluded", "siteAppearance", "readingOverrides", "docsReadingView", "readingView"].some((key) => key in changes)) return;
+        const wasReading = readingModeEnabled();
         if (changes.enabled) enabled = changes.enabled.newValue !== false;
         if (changes.excluded) excluded = Array.isArray(changes.excluded.newValue) ? changes.excluded.newValue : [];
         if (changes.siteAppearance) readingAppearance = appearanceForSite(changes.siteAppearance.newValue, hostname);
-        if (changes.readingOverrides) overrides = validOverrides(changes.readingOverrides.newValue);
-        if (changes.docsReadingView) viewSettings = docsReadingView(changes.docsReadingView.newValue);
+        if (changes.readingOverrides) {
+          overrides = validOverrides(changes.readingOverrides.newValue);
+          reader?.setOverrides(overrides);
+        }
+        if (changes.docsReadingView) legacyView = changes.docsReadingView.newValue;
+        if (changes.readingView) rawView = changes.readingView.newValue;
+        viewSettings = readingViewPreferences(rawView, legacyView);
+        if (wasReading === readingModeEnabled() && !changes.enabled && !changes.excluded && !changes.readingOverrides && (readingModeEnabled() || !changes.siteAppearance)) {
+          reader?.appearance(viewSettings, readingAppearance);
+          return;
+        }
         schedule(0);
       });
       async function start() {
-        const state = await chrome.storage.local.get({ enabled: true, excluded: [], siteAppearance: {}, readingOverrides: {}, docsReadingView: {} });
+        const state = await chrome.storage.local.get({ enabled: true, excluded: [], siteAppearance: {}, readingOverrides: {}, docsReadingView: {}, readingView: null });
         enabled = state.enabled !== false;
         excluded = Array.isArray(state.excluded) ? state.excluded : [];
         readingAppearance = appearanceForSite(state.siteAppearance, hostname);
         overrides = validOverrides(state.readingOverrides);
-        viewSettings = docsReadingView(state.docsReadingView);
+        legacyView = state.docsReadingView;
+        rawView = state.readingView;
+        viewSettings = readingViewPreferences(rawView, legacyView);
+        reader?.setOverrides(overrides);
+        reader?.appearance(viewSettings, readingAppearance);
         if (docs) {
           registerPages(document);
           watchDocsInputs(document);
@@ -995,7 +1343,7 @@
         const observer = new MutationObserver((records) => {
           let relevant = false;
           for (const record of records) {
-            if (record.target === host || host.contains(record.target)) continue;
+            if (record.target === host || host.contains(record.target) || reader?.ownsNode(record.target)) continue;
             const element = record.target instanceof Element ? record.target : record.target.parentElement;
             if (docs && element?.closest(".kix-cursor,.kix-selection-overlay,.kix-selection-overlay-content")) continue;
             if (docs && record.type !== "childList" && element?.closest(".kix-page") && element.closest(".kix-page") !== activePage) continue;
@@ -1014,7 +1362,9 @@
         document.addEventListener("scroll", (event) => {
           if (!reader?.owns(event)) schedule(100, "scroll");
         }, { capture: true, passive: true });
-        document.addEventListener("load", () => schedule(), true);
+        document.addEventListener("load", (event) => {
+          if (!reader?.owns(event)) schedule();
+        }, true);
         window.addEventListener("resize", () => schedule(100));
         window.visualViewport?.addEventListener("resize", () => schedule(100));
         document.addEventListener("visibilitychange", () => schedule(0));

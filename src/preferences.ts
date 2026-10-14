@@ -42,3 +42,54 @@ export function docsReadingView(value:unknown):DocsReadingView {
   const v=value as Partial<DocsReadingView>|undefined;
   return {enabled:v?.enabled===true,spacing:typeof v?.spacing==='number'&&Number.isFinite(v.spacing)?Math.max(2.2,Math.min(3.4,v.spacing)):2.8};
 }
+
+export interface ReadingViewPreferences {sites:Record<string,boolean>;spacing:number;fontSize:number;width:number}
+export const panelFontSizes=[16,18,20,24,28,32];
+export function readingViewPreferences(value:unknown,legacy?:unknown):ReadingViewPreferences {
+  const v=value && typeof value==='object' && !Array.isArray(value)?value as Partial<ReadingViewPreferences>:undefined;
+  const old=docsReadingView(legacy);
+  const sites=v?.sites && typeof v.sites==='object' && !Array.isArray(v.sites)?Object.fromEntries(Object.entries(v.sites).filter(([,enabled])=>typeof enabled==='boolean')):!v && old.enabled?{'docs.google.com':true}:{};
+  return {sites,spacing:docsReadingView({spacing:v?.spacing ?? old.spacing}).spacing,fontSize:panelFontSizes.includes(v?.fontSize ?? 0)?v!.fontSize!:20,width:typeof v?.width==='number' && Number.isFinite(v.width)?Math.max(280,Math.min(720,v.width)):420};
+}
+export function panelEnabled(settings:ReadingViewPreferences,hostname:string) {return Object.hasOwn(settings.sites,hostname) && settings.sites[hostname]===true;}
+export async function updateReadingView(patch:Partial<Omit<ReadingViewPreferences,'sites'>>,site?:{hostname:string;enabled:boolean}) {
+  const state=await chrome.storage.local.get(['readingView','docsReadingView']);
+  const current=readingViewPreferences(state.readingView,state.docsReadingView);
+  const next=readingViewPreferences({...current,...patch,sites:site?{...current.sites,[site.hostname]:site.enabled}:current.sites});
+  await chrome.storage.local.set({readingView:next});return next;
+}
+export async function saveCorrection(word:string,reading:string,previousWord?:string) {
+  const correction=validateOverride(word,reading);
+  const state=await chrome.storage.local.get({readingOverrides:{}}),values=validOverrides(state.readingOverrides);
+  if(previousWord && previousWord!==correction.word)delete values[previousWord];
+  if(!Object.hasOwn(values,correction.word) && Object.keys(values).length>=200)throw new Error('You have 200 corrections. Remove one before adding another.');
+  values[correction.word]=correction.reading;
+  await chrome.storage.local.set({readingOverrides:values});return values;
+}
+export async function removeCorrection(word:string) {
+  const state=await chrome.storage.local.get({readingOverrides:{}}),values=validOverrides(state.readingOverrides);
+  delete values[word];await chrome.storage.local.set({readingOverrides:values});return values;
+}
+export const correctionBackupLimit=256*1024;
+export function mergeCorrectionBackup(json:string,existing:Record<string,string>) {
+  if(new TextEncoder().encode(json).length>correctionBackupLimit)throw new Error('Choose a backup smaller than 256 KiB.');
+  let data:any;try {data=JSON.parse(json);}catch {throw new Error('This file is not valid JSON.');}
+  if(!data || data.version!==1 || !data.corrections || typeof data.corrections!=='object' || Array.isArray(data.corrections))throw new Error('Choose a version 1 correction backup.');
+  const imported:Record<string,string>={};
+  for(const [word,reading] of Object.entries(data.corrections)) {
+    if(typeof reading!=='string')throw new Error('The backup contains an invalid correction.');
+    const valid=validateOverride(word,reading);
+    if(Object.hasOwn(imported,valid.word) && imported[valid.word]!==valid.reading)throw new Error('The backup contains conflicting normalized words.');
+    imported[valid.word]=valid.reading;
+  }
+  const values={...existing};let added=0,skipped=0;
+  for(const [word,reading] of Object.entries(imported)) {
+    if(Object.hasOwn(values,word))skipped++;else {values[word]=reading;added++;}
+  }
+  if(Object.keys(values).length>200)throw new Error('This import would exceed 200 corrections. Remove some corrections and try again.');
+  return {values,added,skipped};
+}
+export function correctionMatches(word:string,reading:string,query:string) {
+  const normalized=hiragana(query.trim().normalize('NFKC')).toLocaleLowerCase();
+  return hiragana(word.normalize('NFKC')).toLocaleLowerCase().includes(normalized) || reading.includes(normalized);
+}

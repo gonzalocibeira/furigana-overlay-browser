@@ -59,10 +59,76 @@
     const v = value;
     return { enabled: v?.enabled === true, spacing: typeof v?.spacing === "number" && Number.isFinite(v.spacing) ? Math.max(2.2, Math.min(3.4, v.spacing)) : 2.8 };
   }
+  function readingViewPreferences(value, legacy) {
+    const v = value && typeof value === "object" && !Array.isArray(value) ? value : void 0;
+    const old = docsReadingView(legacy);
+    const sites = v?.sites && typeof v.sites === "object" && !Array.isArray(v.sites) ? Object.fromEntries(Object.entries(v.sites).filter(([, enabled]) => typeof enabled === "boolean")) : !v && old.enabled ? { "docs.google.com": true } : {};
+    return { sites, spacing: docsReadingView({ spacing: v?.spacing ?? old.spacing }).spacing, fontSize: panelFontSizes.includes(v?.fontSize ?? 0) ? v.fontSize : 20, width: typeof v?.width === "number" && Number.isFinite(v.width) ? Math.max(280, Math.min(720, v.width)) : 420 };
+  }
+  function panelEnabled(settings, hostname) {
+    return Object.hasOwn(settings.sites, hostname) && settings.sites[hostname] === true;
+  }
+  async function updateReadingView(patch, site) {
+    const state = await chrome.storage.local.get(["readingView", "docsReadingView"]);
+    const current = readingViewPreferences(state.readingView, state.docsReadingView);
+    const next = readingViewPreferences({ ...current, ...patch, sites: site ? { ...current.sites, [site.hostname]: site.enabled } : current.sites });
+    await chrome.storage.local.set({ readingView: next });
+    return next;
+  }
+  async function saveCorrection(word, reading, previousWord) {
+    const correction = validateOverride(word, reading);
+    const state = await chrome.storage.local.get({ readingOverrides: {} }), values = validOverrides(state.readingOverrides);
+    if (previousWord && previousWord !== correction.word) delete values[previousWord];
+    if (!Object.hasOwn(values, correction.word) && Object.keys(values).length >= 200) throw new Error("You have 200 corrections. Remove one before adding another.");
+    values[correction.word] = correction.reading;
+    await chrome.storage.local.set({ readingOverrides: values });
+    return values;
+  }
+  async function removeCorrection(word) {
+    const state = await chrome.storage.local.get({ readingOverrides: {} }), values = validOverrides(state.readingOverrides);
+    delete values[word];
+    await chrome.storage.local.set({ readingOverrides: values });
+    return values;
+  }
+  function mergeCorrectionBackup(json, existing) {
+    if (new TextEncoder().encode(json).length > correctionBackupLimit) throw new Error("Choose a backup smaller than 256 KiB.");
+    let data;
+    try {
+      data = JSON.parse(json);
+    } catch {
+      throw new Error("This file is not valid JSON.");
+    }
+    if (!data || data.version !== 1 || !data.corrections || typeof data.corrections !== "object" || Array.isArray(data.corrections)) throw new Error("Choose a version 1 correction backup.");
+    const imported = {};
+    for (const [word, reading] of Object.entries(data.corrections)) {
+      if (typeof reading !== "string") throw new Error("The backup contains an invalid correction.");
+      const valid = validateOverride(word, reading);
+      if (Object.hasOwn(imported, valid.word) && imported[valid.word] !== valid.reading) throw new Error("The backup contains conflicting normalized words.");
+      imported[valid.word] = valid.reading;
+    }
+    const values = { ...existing };
+    let added = 0, skipped = 0;
+    for (const [word, reading] of Object.entries(imported)) {
+      if (Object.hasOwn(values, word)) skipped++;
+      else {
+        values[word] = reading;
+        added++;
+      }
+    }
+    if (Object.keys(values).length > 200) throw new Error("This import would exceed 200 corrections. Remove some corrections and try again.");
+    return { values, added, skipped };
+  }
+  function correctionMatches(word, reading, query) {
+    const normalized = hiragana(query.trim().normalize("NFKC")).toLocaleLowerCase();
+    return hiragana(word.normalize("NFKC")).toLocaleLowerCase().includes(normalized) || reading.includes(normalized);
+  }
+  var panelFontSizes, correctionBackupLimit;
   var init_preferences = __esm({
     "src/preferences.ts"() {
       "use strict";
       init_shared();
+      panelFontSizes = [16, 18, 20, 24, 28, 32];
+      correctionBackupLimit = 256 * 1024;
     }
   });
 
@@ -77,7 +143,7 @@
           if (tab?.url && /^https?:/.test(tab.url)) hostname = new URL(tab.url).hostname;
         } catch {
         }
-        const state = await chrome.storage.local.get({ enabled: true, excluded: [], siteAppearance: {}, readingOverrides: {}, docsReadingView: {} });
+        const state = await chrome.storage.local.get({ enabled: true, excluded: [], siteAppearance: {}, readingOverrides: {}, docsReadingView: {}, readingView: null });
         const enabled = document.querySelector("#enabled");
         const excluded = document.querySelector("#excluded");
         const status = document.querySelector("#status");
@@ -140,20 +206,21 @@
             show("Could not save the site preference. Reopen the menu and try again.", "unavailable");
           }
         };
-        const docsPage = hostname === "docs.google.com" && !!tab.url && new URL(tab.url).pathname.startsWith("/document/");
-        document.querySelector("#docs-reading-panel").hidden = !docsPage;
-        const viewEnabled = document.querySelector("#docs-reading-enabled");
-        const spacing = document.querySelector("#docs-reading-spacing");
-        const view = docsReadingView(state.docsReadingView);
-        viewEnabled.checked = view.enabled;
+        const viewEnabled = document.querySelector("#view-reading-enabled");
+        const spacing = document.querySelector("#view-reading-spacing");
+        const fontSize = document.querySelector("#panel-font-size");
+        const view = readingViewPreferences(state.readingView, state.docsReadingView);
+        viewEnabled.checked = panelEnabled(view, hostname);
+        viewEnabled.disabled = !hostname;
         spacing.value = String(view.spacing);
-        spacing.disabled = !view.enabled;
-        async function saveReadingView() {
-          const feedback2 = document.querySelector("#docs-reading-feedback");
+        fontSize.value = String(view.fontSize);
+        spacing.disabled = fontSize.disabled = !hostname;
+        async function saveReadingView(event) {
+          const feedback2 = document.querySelector("#view-reading-feedback");
           try {
-            await chrome.storage.local.set({ docsReadingView: { enabled: viewEnabled.checked, spacing: Number(spacing.value) } });
-            spacing.disabled = !viewEnabled.checked;
-            feedback2.textContent = "Saved for Google Docs.";
+            const patch = event.target === spacing ? { spacing: Number(spacing.value) } : event.target === fontSize ? { fontSize: Number(fontSize.value) } : {};
+            await updateReadingView(patch, event.target === viewEnabled ? { hostname, enabled: viewEnabled.checked } : void 0);
+            feedback2.textContent = `Panel preference saved for ${hostname}. Text size and spacing apply everywhere.`;
             feedback2.dataset.error = "false";
             changed();
           } catch {
@@ -161,7 +228,7 @@
             feedback2.dataset.error = "true";
           }
         }
-        viewEnabled.onchange = spacing.onchange = () => void saveReadingView();
+        viewEnabled.onchange = spacing.onchange = fontSize.onchange = (event) => void saveReadingView(event);
         const size = document.querySelector("#reading-size");
         const contrast = document.querySelector("#reading-contrast");
         const initial = appearanceForSite(state.siteAppearance, hostname);
@@ -191,6 +258,8 @@
         const list = document.querySelector("#corrections");
         const cancelEdit = document.querySelector("#cancel-edit");
         const feedback = document.querySelector("#correction-feedback");
+        const search = document.querySelector("#correction-search");
+        let currentCorrections = validOverrides(state.readingOverrides);
         let editingWord;
         function report(text, error = false) {
           feedback.textContent = text;
@@ -206,9 +275,13 @@
           report("");
         };
         function renderCorrections(values) {
+          currentCorrections = values;
           list.replaceChildren();
           document.querySelector("#correction-count").textContent = Object.keys(values).length ? `(${Object.keys(values).length})` : "";
+          let matches = 0;
           for (const [w, r] of Object.entries(values)) {
+            if (!correctionMatches(w, r, search.value)) continue;
+            matches++;
             const row = document.createElement("li");
             row.className = "correction";
             const copy = document.createElement("span");
@@ -233,9 +306,7 @@
             remove.setAttribute("aria-label", `Remove ${w}`);
             remove.onclick = async () => {
               try {
-                const latest = await chrome.storage.local.get({ readingOverrides: {} }), values2 = validOverrides(latest.readingOverrides);
-                delete values2[w];
-                await chrome.storage.local.set({ readingOverrides: values2 });
+                const values2 = await removeCorrection(w);
                 renderCorrections(values2);
                 if (editingWord === w) reset();
                 report("Correction removed.");
@@ -247,23 +318,63 @@
             row.append(copy, edit, remove);
             list.append(row);
           }
+          document.querySelector("#correction-empty").hidden = matches > 0 || !search.value.trim();
         }
         renderCorrections(validOverrides(state.readingOverrides));
         form.onsubmit = async (event) => {
           event.preventDefault();
           try {
-            const correction = validateOverride(word.value, reading.value);
-            const latest = await chrome.storage.local.get({ readingOverrides: {} }), values = validOverrides(latest.readingOverrides);
-            if (editingWord && editingWord !== correction.word) delete values[editingWord];
-            if (!(correction.word in values) && Object.keys(values).length >= 200) throw new Error("You have 200 corrections. Remove one before adding another.");
-            values[correction.word] = correction.reading;
-            await chrome.storage.local.set({ readingOverrides: values });
+            const values = await saveCorrection(word.value, reading.value, editingWord);
             renderCorrections(values);
             reset();
             report("Saved. Readings update automatically.");
             changed();
           } catch (error) {
             report(error instanceof Error ? error.message : "Could not save the correction.", true);
+          }
+        };
+        search.oninput = () => renderCorrections(currentCorrections);
+        chrome.storage.onChanged.addListener((changes, area) => {
+          if (area !== "local") return;
+          if (changes.readingOverrides) renderCorrections(validOverrides(changes.readingOverrides.newValue));
+          if (changes.readingView) {
+            const view2 = readingViewPreferences(changes.readingView.newValue, state.docsReadingView);
+            viewEnabled.checked = panelEnabled(view2, hostname);
+            spacing.value = String(view2.spacing);
+            fontSize.value = String(view2.fontSize);
+          }
+        });
+        document.querySelector("#export-corrections").onclick = async () => {
+          try {
+            const latest = await chrome.storage.local.get({ readingOverrides: {} });
+            const blob = new Blob([JSON.stringify({ version: 1, corrections: validOverrides(latest.readingOverrides) }, null, 2)], { type: "application/json;charset=utf-8" });
+            const url = URL.createObjectURL(blob), link = document.createElement("a");
+            link.href = url;
+            link.download = "furigana-corrections.json";
+            link.click();
+            window.setTimeout(() => URL.revokeObjectURL(url), 1e3);
+            report("Correction backup exported.");
+          } catch {
+            report("Could not export corrections. Try again.", true);
+          }
+        };
+        const file = document.querySelector("#correction-file");
+        document.querySelector("#import-corrections").onclick = () => file.click();
+        file.onchange = async () => {
+          const selected = file.files?.[0];
+          if (!selected) return;
+          try {
+            if (selected.size > correctionBackupLimit) throw new Error("Choose a backup smaller than 256 KiB.");
+            const json = await selected.text(), latest = await chrome.storage.local.get({ readingOverrides: {} });
+            const result = mergeCorrectionBackup(json, validOverrides(latest.readingOverrides));
+            await chrome.storage.local.set({ readingOverrides: result.values });
+            renderCorrections(result.values);
+            report(`Imported ${result.added} corrections; skipped ${result.skipped} existing words.`);
+            changed();
+          } catch (error) {
+            report(error instanceof Error ? error.message : "Could not import corrections.", true);
+          } finally {
+            file.value = "";
           }
         };
         changed();

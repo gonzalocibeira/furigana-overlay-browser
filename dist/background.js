@@ -69,10 +69,12 @@
     }
     return Object.fromEntries(entries);
   }
+  var correctionBackupLimit;
   var init_preferences = __esm({
     "src/preferences.ts"() {
       "use strict";
       init_shared();
+      correctionBackupLimit = 256 * 1024;
     }
   });
 
@@ -116,8 +118,12 @@
       }
       chrome.runtime.onMessage.addListener((message, sender, respond) => {
         if (message?.type !== "define-word") return;
-        const url = sender.url ? new URL(sender.url) : void 0;
-        if (sender.tab?.id === void 0 || url?.origin !== "https://docs.google.com" || !url.pathname.startsWith("/document/") || typeof message.word !== "string" || !/^[\p{L}\p{M}\p{N}々〆ー・\s'-]{1,80}$/u.test(message.word) || !message.word.trim()) {
+        let url;
+        try {
+          url = sender.url ? new URL(sender.url) : void 0;
+        } catch {
+        }
+        if (sender.tab?.id === void 0 || sender.frameId !== 0 || !url || !["http:", "https:"].includes(url.protocol) || typeof message.word !== "string" || !/^[\p{L}\p{M}\p{N}々〆ー・\s'-]{1,80}$/u.test(message.word) || !message.word.trim()) {
           respond({ error: "Invalid dictionary request" });
           return;
         }

@@ -1,6 +1,6 @@
 {
   "name": "furigana-overlay-browser",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Automatic offline viewport-bounded furigana overlays",
   "scripts": {
     "build": "node scripts/build.mjs",
