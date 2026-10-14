@@ -29,6 +29,7 @@ export class ReadingPanel {
   private status:HTMLElement;
   private context='';
   private scrollTop=0;
+  private rendered?:string;
   private definition:HTMLElement;
   private lookupVersion=0;
   private selected?:HTMLButtonElement;
@@ -49,7 +50,10 @@ export class ReadingPanel {
     this.root.addEventListener('keydown',event=>{if((event as KeyboardEvent).key==='Escape' && !this.definition.hidden) {event.preventDefault();this.dismissDefinition(true);}});
   }
   owns(event:Event) {return event.composedPath().includes(this.host);}
-  loading(show:boolean,text:string) {
+  loading(show:boolean,text:string,keepContent=false) {
+    // Leave the readable snapshot and open definition in place while debouncing.
+    if(show && keepContent && this.rendered!==undefined)return;
+    this.rendered=undefined;
     this.dismissDefinition();
     if(!show) {this.host.remove();this.content.replaceChildren();this.context='';this.scrollTop=0;return;}
     if(!this.host.isConnected)document.documentElement.append(this.host);
@@ -58,13 +62,20 @@ export class ReadingPanel {
     this.content.replaceChildren(p);this.status.textContent='Only the active page’s visible text is processed.';
   }
   display(runs:ReadingRun[],context:string,settings:DocsReadingView,appearance:Appearance,top:number,limited:boolean) {
-    this.dismissDefinition();
     this.host.style.setProperty('--reader-top',`${Math.max(12,Math.min(top,innerHeight-180))}px`);
     this.host.style.setProperty('--reader-spacing',String(settings.spacing));
     this.host.style.setProperty('--reader-ruby',`${.5*appearance.scale}em`);
     this.root.querySelector('.reader')!.classList.toggle('high',appearance.contrast==='high');
+    const lines=readingLines(runs),rendered=JSON.stringify([context,lines]);
+    const status=`${context==='pageless'?'Visible document text':'Active page · visible text'} · Text-only view${limited?' · View limit reached':''}.`;
+    if(this.status.textContent!==status)this.status.textContent=status;
+    // Docs frequently redraws identical canvas tiles. Preserve selection, scroll,
+    // focus, and definitions when the readable text has not actually changed.
+    if(rendered===this.rendered)return;
+    if(this.rendered!==undefined)this.scrollTop=this.content.scrollTop;
+    this.dismissDefinition();this.rendered=rendered;
     const fragment=document.createDocumentFragment();
-    for(const line of readingLines(runs)) {
+    for(const line of lines) {
       const p=document.createElement('p');p.className='line';let cursor=0;
       // A correction can span tokenizer words. Keep its ruby and click target together.
       const words=(line.words ?? []).map(word=>({...word}));
@@ -98,7 +109,6 @@ export class ReadingPanel {
     if(!runs.length) {const p=document.createElement('p');p.className='empty';p.textContent='No readable text is available in this view.';fragment.append(p);}
     this.content.replaceChildren(fragment);
     this.content.scrollTop=context===this.context?this.scrollTop:0;this.context=context;
-    this.status.textContent=`${context==='pageless'?'Visible document text':'Active page · visible text'} · Text-only view${limited?' · View limit reached':''}.`;
   }
   unavailable(text:string) {this.loading(true,text);}
   private dismissDefinition(focus=false) {

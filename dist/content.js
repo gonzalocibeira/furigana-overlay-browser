@@ -95,6 +95,7 @@
         status;
         context = "";
         scrollTop = 0;
+        rendered;
         definition;
         lookupVersion = 0;
         selected;
@@ -123,7 +124,9 @@
         owns(event) {
           return event.composedPath().includes(this.host);
         }
-        loading(show, text) {
+        loading(show, text, keepContent = false) {
+          if (show && keepContent && this.rendered !== void 0) return;
+          this.rendered = void 0;
           this.dismissDefinition();
           if (!show) {
             this.host.remove();
@@ -141,13 +144,19 @@
           this.status.textContent = "Only the active page\u2019s visible text is processed.";
         }
         display(runs, context, settings, appearance2, top, limited) {
-          this.dismissDefinition();
           this.host.style.setProperty("--reader-top", `${Math.max(12, Math.min(top, innerHeight - 180))}px`);
           this.host.style.setProperty("--reader-spacing", String(settings.spacing));
           this.host.style.setProperty("--reader-ruby", `${0.5 * appearance2.scale}em`);
           this.root.querySelector(".reader").classList.toggle("high", appearance2.contrast === "high");
+          const lines = readingLines(runs), rendered = JSON.stringify([context, lines]);
+          const status = `${context === "pageless" ? "Visible document text" : "Active page \xB7 visible text"} \xB7 Text-only view${limited ? " \xB7 View limit reached" : ""}.`;
+          if (this.status.textContent !== status) this.status.textContent = status;
+          if (rendered === this.rendered) return;
+          if (this.rendered !== void 0) this.scrollTop = this.content.scrollTop;
+          this.dismissDefinition();
+          this.rendered = rendered;
           const fragment = document.createDocumentFragment();
-          for (const line of readingLines(runs)) {
+          for (const line of lines) {
             const p = document.createElement("p");
             p.className = "line";
             let cursor = 0;
@@ -208,7 +217,6 @@
           this.content.replaceChildren(fragment);
           this.content.scrollTop = context === this.context ? this.scrollTop : 0;
           this.context = context;
-          this.status.textContent = `${context === "pageless" ? "Visible document text" : "Active page \xB7 visible text"} \xB7 Text-only view${limited ? " \xB7 View limit reached" : ""}.`;
         }
         unavailable(text) {
           this.loading(true, text);
@@ -501,9 +509,10 @@
           activeRequest = void 0;
         }
         if (activity) delay = pacer.mark(activity);
+        if (docs && viewSettings.enabled && delay > 0) delay = Math.max(400, delay);
         statusState = allowed() ? "loading" : "paused";
         message = !enabled || excluded.includes(hostname) ? "Readings are paused for this page." : document.hidden ? "Paused while this tab is in the background." : composing ? "Waiting for text composition to finish." : activity === "scroll" ? "Waiting for scrolling to settle\u2026" : activity === "edit" ? "Waiting for editing to settle\u2026" : "Updating visible readings\u2026";
-        reader?.loading(viewSettings.enabled && enabled && !excluded.includes(hostname) && !document.hidden, message);
+        reader?.loading(viewSettings.enabled && enabled && !excluded.includes(hostname) && !document.hidden, message, allowed());
         if (allowed()) {
           nextScanAt = performance.now() + delay;
           timer = window.setTimeout(() => {

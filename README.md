@@ -78,7 +78,7 @@ Open the optional **Extra-space reading view** for a separate, selectable panel 
 2. Expand **Google Docs reading view** and enable **Extra-space reading view**.
 3. Choose **Comfortable**, **Roomy**, or **Spacious** line spacing.
 
-The panel follows the active page as you scroll or edit. Continue editing in Docs; click **Close** on the panel to return to overlay readings. The setting is saved across your Google Docs documents.
+The panel follows the active page after scrolling or editing settles, keeping the current text visible while an update waits. Unchanged document redraws preserve your selection, reading position, and open definition. Continue editing in Docs; click **Close** on the panel to return to overlay readings. The setting is saved across your Google Docs documents.
 
 **Click a word for its meaning.** The panel shows English and Japanese definitions, the reading, and the dictionary form for inflected words. Words can also be focused with Tab and opened with Enter or Space; press Escape to dismiss the definition. Definitions come from the English and Japanese editions of Wiktionary and require an internet connection. Only the clicked word's dictionary form is sent for lookup. Each language shows its own unavailable or missing-entry message when necessary; source links let you open the full entry.
 
@@ -176,7 +176,7 @@ npm test
 
 `npm run build` regenerates the included `dist/` folder. Development dependency installation requires internet access; the installed extension works without an external processing service.
 
-The test suite has **21 tests**, including automatic annotations, unchanged source/layout, a 100,000-node webpage, a 100-page Docs fixture, cancellation, IME handling, settings, corrections, the reading panel, and bilingual word definitions. Browser integration tests use a temporary profile and localhost server. They default to Brave's standard macOS executable; set `CHROMIUM_PATH` to an extension-capable Chromium executable elsewhere. Chrome distributions that disable command-line extension loading cannot run these integration tests. Your normal browser profile and Google account are not used.
+The test suite has **22 tests**, including automatic annotations, unchanged source/layout, a 100,000-node webpage, a 100-page Docs fixture, cancellation, IME handling, settings, corrections, the reading panel, debounced refreshes, and bilingual word definitions. Browser integration tests use a temporary profile and localhost server. They default to Brave's standard macOS executable; set `CHROMIUM_PATH` to an extension-capable Chromium executable elsewhere. Chrome distributions that disable command-line extension loading cannot run these integration tests. Your normal browser profile and Google account are not used.
 
 The README uses real-use screenshots supplied by the project owner. Earlier fixture captures are also preserved in [`docs/screenshots/`](docs/screenshots/). Regenerated browser captures are written to `test-results/` during tests.
 
