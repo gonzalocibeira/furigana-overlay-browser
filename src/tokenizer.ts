@@ -8,6 +8,20 @@ const ready = new Promise<kuromoji.Tokenizer<kuromoji.IpadicFeatures>>((resolve,
 });
 const cancelled = new Set<number>();
 const known = new Set<number>();
+// Only word-detail requests need dictionary-form readings. Bound this extra
+// dictionary work and retained data independently from automatic furigana.
+const verbReadings = new Map<string,string>();
+function lemmaReading(tokenizer:kuromoji.Tokenizer<kuromoji.IpadicFeatures>,lemma:string):string|undefined {
+  if(lemma.length>40)return;
+  const cached=verbReadings.get(lemma);if(cached)return cached;
+  const tokens=tokenizer.tokenize(lemma);
+  if(tokens.map(token=>token.surface_form).join('')!==lemma || tokens.some(token=>token.word_type!=='KNOWN' || !token.reading || token.reading==='*'))return;
+  const reading=hiragana(tokens.map(token=>token.reading).join(''));
+  if(!/^[\p{Script=Hiragana}ー]+$/u.test(reading))return;
+  verbReadings.set(lemma,reading);
+  if(verbReadings.size>256)verbReadings.delete(verbReadings.keys().next().value!);
+  return reading;
+}
 let chain=Promise.resolve();
 self.onmessage = event => {
   if(event.data.type==='worker-cancel') {if(known.has(event.data.id))cancelled.add(event.data.id);return;}
@@ -32,7 +46,14 @@ async function run(data: any) {
         for(const token of tokens) {
           const start=text.indexOf(token.surface_form,offset);if(start<0)continue;
           offset=start+token.surface_form.length;
-          if(/[\p{L}\p{N}]/u.test(token.surface_form))entries.push({start,end:offset,lemma:token.basic_form && token.basic_form!=='*'?token.basic_form:token.surface_form,reading:hiragana(token.reading ?? '')});
+          if(/[\p{L}\p{N}]/u.test(token.surface_form)) {
+            const lemma=token.basic_form && token.basic_form!=='*'?token.basic_form:token.surface_form;
+            const verb=token.pos==='動詞' && token.word_type==='KNOWN';
+            const inflected=token.word_type==='KNOWN' && token.conjugated_type && token.conjugated_type!=='*';
+            entries.push({start,end:offset,lemma,reading:hiragana(token.reading ?? ''),pos:token.pos,posDetail:token.pos_detail_1,
+              ...(inflected?{verbClass:token.conjugated_type,verbForm:token.conjugated_form}:{}),
+              ...(verb?{lemmaReading:lemmaReading(tokenizer,lemma)}:{})});
+          }
         }
         words.push(entries);
       }

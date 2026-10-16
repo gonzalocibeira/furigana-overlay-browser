@@ -1,0 +1,62 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Kō release notes</title><style>body{max-width:800px;margin:40px auto;padding:0 24px;font:17px/1.65 system-ui;color:#242b2d;background:#f4ecd8}h1,h2,h3{line-height:1.3}h2{margin-top:36px;padding-top:20px;border-top:1px solid #625d50}li+li{margin-top:10px}a{color:#234e64;overflow-wrap:anywhere}code{overflow-wrap:anywhere}a:focus-visible{outline:3px solid #234e64;outline-offset:3px}</style><nav aria-label="About navigation"><a href="about.html#release-heading">Back to About Kō</a></nav><main><h1>Release notes</h1>
+<h2>1.1.0 · Release candidate</h2>
+<p>Kō 1.1 adds offline ways to explore Japanese while you read. This is a release candidate; it has not been published to the Chrome Web Store.</p>
+<ul>
+<li><strong>Verb Playground:</strong> explore potential, passive, causative, desire, conditionals, requests, commands, and everyday ～て constructions. Applicable tense, negative, polite, and spoken-shortening controls update the form and furigana. Changes are highlighted, Reset restores the exact original, and ambiguous forms offer explicit choices.</li>
+<li><strong>Mimetic Playground:</strong> compare <strong>60 expressions in 30 illustrated scenes</strong>, covering feelings, movement, bodily states, textures, sound, and weather. Each expression has a Japanese example, translation, explanation, and reference. Replay runs a short animation; reduced-motion mode stays static. Hiragana and full-/half-width katakana work, including ザーザー for rain.</li>
+<li><strong>Offline playground workspace:</strong> choose <strong>Playgrounds</strong> to enter a dictionary-form verb directly and confirm its local analysis, or click a verb in the reading panel and choose <strong>Try verb forms</strong> or <strong>Open playgrounds</strong>. The Mimetic tab searches all 60 expressions by Japanese, reading, or English. The full-height workspace opens one tool at a time, keeps controls readable at narrow widths, and restores your position when going back.</li>
+<li><strong>Meaning Forks:</strong> compare common potential/passive/honorific functions of supported ～られる forms, or make/let functions of causatives. The diagrams show possibilities; context determines the interpretation.</li>
+<li><strong>Local word details:</strong> opening a word shows its reading, corrections, and exploration tools offline. Only <strong>Look up definitions online</strong> requests English and Japanese Wiktionary definitions. Loaded definitions stay in memory, and failed lookups can be retried.</li>
+<li>No new browser permissions, runtime services, accounts, API keys, remote assets, or learning-history storage. Existing settings and correction backups remain compatible.</li>
+</ul>
+<h3>Updating</h3>
+<p>Reload the extension, then reload open webpages and Google Docs tabs. Keep the existing installation to retain settings and pronunciation corrections. Experiments stay in Kō's panel and never rewrite the original webpage or document.</p>
+<p>Open <strong>About Kō → What’s new</strong> for these notes and the full offline release history. See the <a href="https://github.com/gonzalocibeira/ko-japanese-reading-companion/blob/master/docs/exploration-notes.md" target="_blank" rel="noopener noreferrer">exploration notes</a> for supported forms and limitations; online definitions and external reference links require an internet connection.</p>
+<h2>1.0.0 · 14 October 2026</h2>
+<p>The first 1.0 release of <strong>Kō — Japanese Reading Companion</strong> brings automatic offline furigana to webpages and Google Docs, with a spacious reading panel and optional bilingual word definitions.</p>
+<ul>
+<li>Renamed the extension <strong>Kō — Japanese Reading Companion</strong>, aligning its name with the 考 mark. Warm paper, ink, muted indigo, and a vermilion seal replace the cobalt-and-gray palette. Repository, npm package, downloads, and internal UI identifiers now use <code>ko-japanese-reading-companion</code> / <code>ko-</code>. Existing saved settings, corrections, and version 1 backups are retained.</li>
+<li>Redesigned the popup, reading panel, definition cards, and correction forms with square controls, bold monospace headings, ink borders, warm paper surfaces, indigo, and vermilion accents. Japanese reading text keeps a readable system font. The popup is 380 px wide with expandable settings and keyboard focus indicators.</li>
+<li>The new 考 (think) mark appears in the popup, reading-panel header, and toolbar. A vermilion icon means readings are enabled and available on this tab; a sand-colored icon with a pause indicator means global or site pause; an outlined icon with a slash means unavailable or a reload is needed. Hover for the reason. The popup remains accessible in all states.</li>
+<li>The toolbar stays active without visible kanji and during scrolling, typing, or background-tab processing pauses. State updates follow navigation, tab activation, preferences, availability recovery, and service-worker restarts. Embedded frames cannot set the top-level icon.</li>
+<li>The reading panel supports 16–32 px text, adjustable line spacing, and pointer or keyboard resizing. Click words for English and Japanese definitions, or save a preferred reading directly in the panel.</li>
+<li>Search, export, and import local reading corrections. Existing settings, corrections, backup formats, overlay appearance, and permissions are preserved.</li>
+</ul>
+<p>Reload the extension, then reload open webpages and Google Docs tabs. The README now uses four current screenshots of real webpage and Google Docs use. Download the ready-to-load extension ZIP from the <a href="https://github.com/gonzalocibeira/ko-japanese-reading-companion/releases/tag/v1.0.0" target="_blank" rel="noopener noreferrer">1.0.0 release</a>.</p>
+<h2>0.5.0 · 14 October 2026</h2>
+<ul>
+<li>The reading panel now works on supported HTTP/HTTPS webpages as well as Google Docs, following visible text with bounded discovery and the existing quiet-period debounce. Activation is remembered per hostname. Existing Docs preferences migrate without enabling other websites.</li>
+<li>Choose 16–32 px panel text, or resize the panel from its left edge using a pointer or keyboard. Font size, spacing, and width are saved across sites. Appearance updates preserve panel content, selection, and definitions without retokenizing.</li>
+<li>Correct a kanji word directly in its detail card, including while definitions are unavailable. Restore automatic readings from the same form. Saved readings are reflected in pronunciation metadata, including multi-token corrections.</li>
+<li>Search corrections by word or reading. Export a version 1 JSON backup or import one up to 256 KiB. Imports keep existing readings on conflicts and reject malformed or over-capacity backups without partial changes.</li>
+<li>No new dependencies or permissions. Furigana stays offline; explicit word definitions use the same Wiktionary services on webpages and Docs.</li>
+</ul>
+<p>Reload the extension from the rebuilt <code>dist/</code> folder, then reload open tabs. The panel still uses text-only extraction; browser-protected pages, images, PDFs, unsupported canvas editors, and cross-frame aggregation remain unsupported.</p>
+<h2>0.4.0 · 14 October 2026</h2>
+<p>This release adds bilingual word definitions, steadier Google Docs reading-panel updates, and better readings for vocabulary entries. It includes all code changes made on 14 October 2026.</p>
+<h3>Word definitions in the Docs reading panel</h3>
+<ul>
+<li>Click a word to see English and Japanese definitions from Wiktionary, its reading, and its dictionary form when inflected. Kana-only words are also selectable.</li>
+<li>Use Tab to focus words, Enter or Space to open a definition, and Escape to dismiss it and return focus to the word.</li>
+<li>English and Japanese results have separate missing-entry and connection-error messages. Click again to retry failed requests; source links open the original entries.</li>
+<li>Successful and missing lookups are cached in panel memory for up to 100 words. Concurrent requests for the same word are shared, and late responses cannot replace a newer selection or reopen a closed card.</li>
+<li>Lookups happen only when requested. Only the clicked word's dictionary form is sent to the English and Japanese Wiktionary APIs, without credentials or a referrer. Definitions are rendered as text; remote markup is not attached to the panel. Furigana processing remains offline.</li>
+</ul>
+<h3>Steadier Docs reading-panel updates</h3>
+<ul>
+<li>Routine updates wait for at least 400 ms of quiet after activity. The current text and open definition stay visible while the next snapshot is prepared.</li>
+<li>Identical text and readings do not rebuild the panel, preserving selection, keyboard focus, scroll position, and open definitions across Docs redraws.</li>
+<li>Actual text changes update the panel after the quiet period. IME composition and unavailable text still clear it; disabling the panel or hiding the tab removes it immediately.</li>
+</ul>
+<h3>Vocabulary-reading fixes</h3>
+<ul>
+<li>Isolated Japanese headwords and translation lines such as <code>出口 = salida</code> prefer an exact common-noun dictionary alternative when normal analysis chooses a proper name. <code>出口</code> now receives <code>でぐち</code> in this context instead of the surname reading <code>いでぐち</code>.</li>
+<li>Translation-line detection supports <code>=</code>, <code>＝</code>, <code>:</code>, and <code>：</code> with a Latin-script gloss, including leading whitespace and multiple lines. The rule consults the bundled dictionary rather than a list of word-specific corrections.</li>
+<li>Sentences and names with surrounding context keep normal analysis. Saved corrections take priority, and their uncorrected fragments retain the original context. Cached readings also distinguish source context.</li>
+<li>The same reading choice reaches in-document overlays and the reading panel's word metadata.</li>
+</ul>
+<h3>Validation</h3>
+<p>The release is checked with <code>npm run build</code>, <code>npm run typecheck</code>, and all 27 Playwright tests. Tests include the actual bundled dictionary, Docs overlays and word metadata, name and sentence readings, saved corrections, definition lookups, refresh behavior, and existing large-document and IME fixtures. Browser tests use a temporary profile and synthetic documents.</p>
+<h3>Updating</h3>
+<p>Replace the contents of your existing extension folder with the updated <code>dist/</code> build. Click <strong>Reload</strong> for Kō — Japanese Reading Companion on <code>chrome://extensions</code>, then reload open webpages and Google Docs tabs. Keeping the same extension folder helps retain preferences and saved corrections. No npm installation is needed to use the packaged extension.</p>
+<p>Standalone names can still be ambiguous and may need a local correction. Definitions require internet access, and the Docs adapter still depends on Google's undocumented text geometry.</p></main></html>
