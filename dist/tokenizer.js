@@ -4680,6 +4680,19 @@
       });
       var cancelled = /* @__PURE__ */ new Set();
       var known = /* @__PURE__ */ new Set();
+      var verbReadings = /* @__PURE__ */ new Map();
+      function lemmaReading(tokenizer, lemma) {
+        if (lemma.length > 40) return;
+        const cached = verbReadings.get(lemma);
+        if (cached) return cached;
+        const tokens = tokenizer.tokenize(lemma);
+        if (tokens.map((token) => token.surface_form).join("") !== lemma || tokens.some((token) => token.word_type !== "KNOWN" || !token.reading || token.reading === "*")) return;
+        const reading = hiragana(tokens.map((token) => token.reading).join(""));
+        if (!/^[\p{Script=Hiragana}ー]+$/u.test(reading)) return;
+        verbReadings.set(lemma, reading);
+        if (verbReadings.size > 256) verbReadings.delete(verbReadings.keys().next().value);
+        return reading;
+      }
       var chain = Promise.resolve();
       self.onmessage = (event) => {
         if (event.data.type === "worker-cancel") {
@@ -4716,7 +4729,21 @@
                 const start = text.indexOf(token.surface_form, offset);
                 if (start < 0) continue;
                 offset = start + token.surface_form.length;
-                if (/[\p{L}\p{N}]/u.test(token.surface_form)) entries.push({ start, end: offset, lemma: token.basic_form && token.basic_form !== "*" ? token.basic_form : token.surface_form, reading: hiragana(token.reading ?? "") });
+                if (/[\p{L}\p{N}]/u.test(token.surface_form)) {
+                  const lemma = token.basic_form && token.basic_form !== "*" ? token.basic_form : token.surface_form;
+                  const verb = token.pos === "\u52D5\u8A5E" && token.word_type === "KNOWN";
+                  const inflected = token.word_type === "KNOWN" && token.conjugated_type && token.conjugated_type !== "*";
+                  entries.push({
+                    start,
+                    end: offset,
+                    lemma,
+                    reading: hiragana(token.reading ?? ""),
+                    pos: token.pos,
+                    posDetail: token.pos_detail_1,
+                    ...inflected ? { verbClass: token.conjugated_type, verbForm: token.conjugated_form } : {},
+                    ...verb ? { lemmaReading: lemmaReading(tokenizer, lemma) } : {}
+                  });
+                }
               }
               words.push(entries);
             }
