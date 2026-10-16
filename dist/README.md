@@ -7,7 +7,7 @@
 <p align="center">Automatic Japanese readings for webpages and Google Docs.<br>Furigana runs on your device. Optional word definitions use Wiktionary online.</p>
 <p align="center">Version <strong>1.0.0</strong> · 14 October 2026</p>
 <p align="center">
-  <a href="#install-in-chrome">Install in Chrome</a> ·
+  <a href="https://chromewebstore.google.com/detail/khhdlbblmannlpbkmhmppakldpjhaiok">Install from the Chrome Web Store</a> ·
   <a href="#see-it-in-action">See it in action</a> ·
   <a href="#make-it-yours">Make it yours</a> ·
   <a href="#help-and-compatibility">Get help</a> ·
@@ -39,17 +39,19 @@ Read the [full release notes](docs/release-notes.md) for details and update inst
 
 ## Install in Chrome
 
-**Download → Extract → Load `dist` → Start reading.** No Node.js, npm, or build step needed.
+**[Install Kō from the Chrome Web Store](https://chromewebstore.google.com/detail/khhdlbblmannlpbkmhmppakldpjhaiok).** Click **Add to Chrome**, confirm the installation, then reload your open tabs to start reading. Store installations receive updates automatically.
 
-The ready-to-load **Kō — Japanese Reading Companion** extension is included in [`dist/`](). It is distributed through GitHub, not the Chrome Web Store.
+**Tip:** Pin **Kō — Japanese Reading Companion** from Chrome's puzzle-piece **Extensions** menu. Look for the warm-paper **考** (think) on a vermilion seal.
+
+### Manual installation
+
+You can also load the ready-to-use extension from [`dist/`](). No Node.js, npm, or build step needed.
 
 1. **Download the [1.0.0 extension ZIP](https://github.com/gonzalocibeira/ko-japanese-reading-companion/releases/download/v1.0.0/ko-japanese-reading-companion-1.0.0.zip).** It contains the ready-to-load `dist` folder. You can also download the full source from [the repository](https://github.com/gonzalocibeira/ko-japanese-reading-companion) using **Code → Download ZIP**.
 2. **Extract and keep the folder.** Put it somewhere permanent, such as `Documents/Ko`.
 3. **Open Chrome's extensions page.** Enter `chrome://extensions` in the address bar and turn on **Developer mode**.
 4. **Load the extension.** Click **Load unpacked** and select the **extension folder** inside the extracted folder. It contains `manifest.json`.
 5. **Reload your tabs and read.** Furigana starts automatically. The first page may take a moment while the bundled reading dictionary loads.
-
-**Tip:** Pin **Kō — Japanese Reading Companion** from Chrome's puzzle-piece **Extensions** menu. Look for the warm-paper **考** (think) on a vermilion seal.
 
 <details>
 <summary><strong>Which folder should I select?</strong></summary>
@@ -199,11 +201,11 @@ Browser tests cover paged and pageless fixtures, editing, IME input, and page sw
 <details>
 <summary><strong>Update or uninstall</strong></summary>
 
-There are no automatic Web Store updates.
+**Chrome Web Store installation:** Chrome updates Kō automatically when a new release is available. After an update, reload open webpages and Google Docs tabs.
 
-**To update:** Download and extract the latest repository ZIP, replace the contents of your existing extension folder, then click the extension's **Reload** icon on `chrome://extensions`. Reload open webpages and Google Docs tabs too. Keeping the same folder and reloading the existing installation helps retain preferences and corrections.
+**Manual installation:** Download and extract the latest repository ZIP, replace the contents of your existing extension folder, then click the extension's **Reload** icon on `chrome://extensions`. Reload open webpages and Google Docs tabs too. Keeping the same folder and reloading the existing installation helps retain preferences and corrections.
 
-**To uninstall:** Click **Remove** on the extension's card in `chrome://extensions`. You can then delete its local folder.
+**To uninstall:** Click **Remove** on the extension's card in `chrome://extensions`. If you installed manually, you can then delete its local folder.
 
 </details>
 
