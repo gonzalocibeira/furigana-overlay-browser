@@ -1,0 +1,12 @@
+{
+  "kana": {
+    "feedback": "That derived construction is outside the supported forms. Try its original dictionary verb.",
+    "choices": []
+  },
+  "kanji": {
+    "feedback": "Confirm the dictionary form, reading, and class to begin.",
+    "choices": [
+      "Use 入れる · いれる · Ichidan"
+    ]
+  }
+}

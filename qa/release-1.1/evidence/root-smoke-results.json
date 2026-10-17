@@ -1,0 +1,16 @@
+{
+  "native": {
+    "error": "Error: worker.evaluate: Error: Cannot show popup for an inactive window. To show the popup for this window, first call `chrome.windows.update` with `focused` set to true."
+  },
+  "live": {
+    "result": {
+      "text": "Englishschool (institution dedicated to teaching and learning)English Wiktionary ↗日本語何らかの教育が体系的に行われる組織又はその設備。学舎、まなびや。語義1のうち、教育する事項について履修課程を定め、学生又は児童、生徒の修学状況を管理し、それを証する機関。ただし教育機関であっても学習塾や予備校などは除く。(法律) 日本の学校教育法においては幼稚園、小学校、中学校、義務教育学校、高等学校、中等教育学校、特別支援学校、大学及び高等専門学校とされる（同法第一条）。授業。ウィクショナリー日本語版 ↗Wiktionary · CC BY-SA · Only this word is sent for lookup.",
+      "button": "Definitions loaded"
+    },
+    "errors": [],
+    "requests": [
+      "https://en.wiktionary.org/w/api.php?action=parse&page=%E5%AD%A6%E6%A0%A1&prop=text&format=json&formatversion=2&redirects=1&disableeditsection=1",
+      "https://ja.wiktionary.org/w/api.php?action=parse&page=%E5%AD%A6%E6%A0%A1&prop=text&format=json&formatversion=2&redirects=1&disableeditsection=1"
+    ]
+  }
+}

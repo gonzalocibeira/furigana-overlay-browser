@@ -48,6 +48,13 @@
   });
 
   // src/preferences.ts
+  function appearance(value) {
+    const v = value;
+    return { scale: typeof v?.scale === "number" && Number.isFinite(v.scale) ? Math.max(0.75, Math.min(1.5, v.scale)) : 1, contrast: v?.contrast === "high" ? "high" : "auto" };
+  }
+  function appearanceForSite(value, hostname) {
+    return appearance(value && typeof value === "object" ? value[hostname] : void 0);
+  }
   function validateOverride(word, reading) {
     word = word.trim().normalize("NFC");
     reading = hiragana(reading.trim().normalize("NFKC"));
@@ -69,11 +76,50 @@
     }
     return Object.fromEntries(entries);
   }
-  var correctionBackupLimit;
+  function docsReadingView(value) {
+    const v = value;
+    return { enabled: v?.enabled === true, spacing: typeof v?.spacing === "number" && Number.isFinite(v.spacing) ? Math.max(2.2, Math.min(3.4, v.spacing)) : 2.8 };
+  }
+  function readingViewPreferences(value, legacy) {
+    const v = value && typeof value === "object" && !Array.isArray(value) ? value : void 0;
+    const old = docsReadingView(legacy);
+    const sites = v?.sites && typeof v.sites === "object" && !Array.isArray(v.sites) ? Object.fromEntries(Object.entries(v.sites).filter(([, enabled]) => typeof enabled === "boolean")) : !v && old.enabled ? { "docs.google.com": true } : {};
+    return { sites, spacing: docsReadingView({ spacing: v?.spacing ?? old.spacing }).spacing, fontSize: panelFontSizes.includes(v?.fontSize ?? 0) ? v.fontSize : 20, width: typeof v?.width === "number" && Number.isFinite(v.width) ? Math.max(280, Math.min(720, v.width)) : 420 };
+  }
+  function mergeCorrectionBackup(json, existing) {
+    if (new TextEncoder().encode(json).length > correctionBackupLimit) throw new Error("Choose a backup smaller than 256 KiB.");
+    let data;
+    try {
+      data = JSON.parse(json);
+    } catch {
+      throw new Error("This file is not valid JSON.");
+    }
+    if (!data || data.version !== 1 || !data.corrections || typeof data.corrections !== "object" || Array.isArray(data.corrections)) throw new Error("Choose a version 1 correction backup.");
+    const imported = {};
+    for (const [word, reading] of Object.entries(data.corrections)) {
+      if (typeof reading !== "string") throw new Error("The backup contains an invalid correction.");
+      const valid = validateOverride(word, reading);
+      if (Object.hasOwn(imported, valid.word) && imported[valid.word] !== valid.reading) throw new Error("The backup contains conflicting normalized words.");
+      imported[valid.word] = valid.reading;
+    }
+    const values = { ...existing };
+    let added = 0, skipped = 0;
+    for (const [word, reading] of Object.entries(imported)) {
+      if (Object.hasOwn(values, word)) skipped++;
+      else {
+        values[word] = reading;
+        added++;
+      }
+    }
+    if (Object.keys(values).length > 200) throw new Error("This import would exceed 200 corrections. Remove some corrections and try again.");
+    return { values, added, skipped };
+  }
+  var panelFontSizes, correctionBackupLimit;
   var init_preferences = __esm({
     "src/preferences.ts"() {
       "use strict";
       init_shared();
+      panelFontSizes = [16, 18, 20, 24, 28, 32];
       correctionBackupLimit = 256 * 1024;
     }
   });
@@ -216,12 +262,123 @@
     }
   });
 
+  // src/preference-writer.ts
+  var require_preference_writer = __commonJS({
+    "src/preference-writer.ts"() {
+      "use strict";
+      init_preferences();
+      var pending = Promise.resolve();
+      function string(value, limit) {
+        if (typeof value !== "string" || value.length > limit) throw new Error("Invalid preference value.");
+        return value;
+      }
+      function hostname(value) {
+        const name = string(value, 253);
+        if (!name || /[\s/\\?#]/u.test(name)) throw new Error("Invalid website preference.");
+        return name;
+      }
+      function record(value) {
+        if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid preference value.");
+        return value;
+      }
+      async function apply(mutation) {
+        switch (mutation.kind) {
+          case "reading-view": {
+            const patch = record(mutation.patch);
+            if (Object.entries(patch).some(([key, value]) => !["spacing", "fontSize", "width"].includes(key) || typeof value !== "number" || !Number.isFinite(value))) throw new Error("Invalid reading panel preference.");
+            if (mutation.site) {
+              hostname(mutation.site.hostname);
+              if (typeof mutation.site.enabled !== "boolean") throw new Error("Invalid website preference.");
+            }
+            const state = await chrome.storage.local.get(["readingView", "docsReadingView"]);
+            const current = readingViewPreferences(state.readingView, state.docsReadingView);
+            const next = readingViewPreferences({ ...current, ...patch, sites: mutation.site ? { ...current.sites, [mutation.site.hostname]: mutation.site.enabled } : current.sites });
+            await chrome.storage.local.set({ readingView: next });
+            return next;
+          }
+          case "save-correction": {
+            const correction = validateOverride(string(mutation.word, 80), string(mutation.reading, 80));
+            const previous = mutation.previousWord === void 0 ? void 0 : string(mutation.previousWord, 80).trim().normalize("NFC");
+            const state = await chrome.storage.local.get({ readingOverrides: {} }), values = validOverrides(state.readingOverrides);
+            if (previous && previous !== correction.word) delete values[previous];
+            if (!Object.hasOwn(values, correction.word) && Object.keys(values).length >= 200) throw new Error("You have 200 corrections. Remove one before adding another.");
+            values[correction.word] = correction.reading;
+            await chrome.storage.local.set({ readingOverrides: values });
+            return values;
+          }
+          case "remove-correction": {
+            const word = string(mutation.word, 80).trim().normalize("NFC");
+            const state = await chrome.storage.local.get({ readingOverrides: {} }), values = validOverrides(state.readingOverrides);
+            delete values[word];
+            await chrome.storage.local.set({ readingOverrides: values });
+            return values;
+          }
+          case "import-corrections": {
+            if (typeof mutation.json !== "string") throw new Error("Invalid correction backup.");
+            if (mutation.json.length > correctionBackupLimit) throw new Error("Choose a backup smaller than 256 KiB.");
+            const json = mutation.json;
+            const state = await chrome.storage.local.get({ readingOverrides: {} });
+            const result = mergeCorrectionBackup(json, validOverrides(state.readingOverrides));
+            await chrome.storage.local.set({ readingOverrides: result.values });
+            return result;
+          }
+          case "pause-site": {
+            const name = hostname(mutation.hostname);
+            if (typeof mutation.paused !== "boolean") throw new Error("Invalid website preference.");
+            const state = await chrome.storage.local.get({ excluded: [] });
+            const sites = new Set(Array.isArray(state.excluded) ? state.excluded.filter((site) => typeof site === "string") : []);
+            mutation.paused ? sites.add(name) : sites.delete(name);
+            const excluded = [...sites];
+            await chrome.storage.local.set({ excluded });
+            return excluded;
+          }
+          case "site-appearance": {
+            const name = hostname(mutation.hostname), patch = record(mutation.patch);
+            if (Object.entries(patch).some(([key, value]) => key === "scale" ? typeof value !== "number" || !Number.isFinite(value) : key !== "contrast" || !["auto", "high"].includes(String(value)))) throw new Error("Invalid reading appearance.");
+            const state = await chrome.storage.local.get({ siteAppearance: {} });
+            const sites = state.siteAppearance && typeof state.siteAppearance === "object" && !Array.isArray(state.siteAppearance) ? { ...state.siteAppearance } : {};
+            const next = appearance({ ...appearanceForSite(sites, name), ...patch });
+            sites[name] = next;
+            await chrome.storage.local.set({ siteAppearance: sites });
+            return next;
+          }
+          default:
+            throw new Error("Invalid preference operation.");
+        }
+      }
+      chrome.runtime.onMessage.addListener((message, sender, respond) => {
+        if (message?.type !== "mutate-preferences") return;
+        const popup = sender.url === chrome.runtime.getURL("popup.html");
+        let webpage = false;
+        try {
+          webpage = sender.tab?.id !== void 0 && sender.frameId === 0 && ["http:", "https:"].includes(new URL(sender.url ?? "").protocol);
+        } catch {
+        }
+        if (sender.id !== chrome.runtime.id || !popup && !webpage) {
+          respond({ error: "Invalid preference sender." });
+          return;
+        }
+        if (!message.mutation || typeof message.mutation !== "object" || Array.isArray(message.mutation)) {
+          respond({ error: "Invalid preference operation." });
+          return;
+        }
+        const job = pending.then(() => apply(message.mutation));
+        pending = job.then(() => {
+        }, () => {
+        });
+        void job.then((value) => respond({ value }), (error) => respond({ error: error instanceof Error ? error.message : "Could not save the preference. Try again." }));
+        return true;
+      });
+    }
+  });
+
   // src/background.ts
   var require_background = __commonJS({
     "src/background.ts"() {
       init_preferences();
       var import_dictionary = __toESM(require_dictionary());
       var import_action = __toESM(require_action());
+      var import_preference_writer = __toESM(require_preference_writer());
       var creating;
       async function ensureOffscreen() {
         const contexts = await chrome.runtime.getContexts({ contextTypes: [chrome.runtime.ContextType.OFFSCREEN_DOCUMENT] });

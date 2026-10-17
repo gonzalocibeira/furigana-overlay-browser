@@ -6,7 +6,8 @@
     "build": "node scripts/build.mjs",
     "typecheck": "tsc",
     "test": "playwright test",
-    "package:store": "node scripts/package-store.mjs"
+    "package:store": "node scripts/package-store.mjs",
+    "package:release": "node scripts/package-release.mjs"
   },
   "keywords": [],
   "author": "",

@@ -21,6 +21,7 @@ test.beforeAll(async()=>{
   await context.route('https://*.wiktionary.org/w/api.php*',route=>{requests.push(route.request().url());return route.abort();});
 });
 test.afterAll(async()=>{await context?.close();await new Promise<void>(resolve=>server?.close(()=>resolve()));if(profile)await rm(profile,{recursive:true,force:true});});
+test.beforeEach(()=>{requests.length=0;});
 
 async function reader(page:Page,fn:string) {
   const session=await context.newCDPSession(page);
@@ -36,6 +37,7 @@ async function reader(page:Page,fn:string) {
 async function open(page:Page,surface:string) {
   await expect.poll(()=>reader(page,`function(){return !!this.querySelector('[data-surface="${surface}"]')}`),{timeout:30000}).toBe(true);
   await reader(page,`function(){this.querySelector('[data-surface="${surface}"]').click();this.querySelector('.explore-toggle')?.click()}`);
+  await expect.poll(()=>reader(page,`function(){return this.querySelector('.definition-body')?.getAttribute('aria-busy')}`)).toBe('false');
 }
 const plainResult=`function(){const node=this.querySelector('.verb-japanese')?.cloneNode(true);node?.querySelectorAll('rt').forEach(rt=>rt.remove());return node?.textContent}`;
 
@@ -44,6 +46,8 @@ test('verb controls explore the full chain locally, preserve source, reset, and 
   try {
     await page.goto(base);const before=await page.locator('main').innerHTML();
     await open(page,'読ん');
+    expect(requests.map(url=>new URL(url).searchParams.get('page'))).toEqual(['読む','読む']);
+    const wordRequests=requests.slice();
     expect(await reader(page,`function(){return this.querySelector('.explore-toggle').textContent}`)).toBe('Try verb forms');
     await expect.poll(()=>reader(page,plainResult)).toBe('読んでいませんでした');
     expect(await reader(page,`function(){return Array.from(this.querySelectorAll('.verb-controls input'),input=>input.checked)}`)).toEqual([true,true,true,false]);
@@ -56,7 +60,7 @@ test('verb controls explore the full chain locally, preserve source, reset, and 
     expect(await reader(page,plainResult)).toBe('読んでいました');
     await page.evaluate(()=>document.dispatchEvent(new Event('scroll')));await page.waitForTimeout(700);
     expect(await reader(page,plainResult)).toBe('読んでいました');
-    expect(await page.locator('main').innerHTML()).toBe(before);expect(requests).toEqual([]);expect(errors).toEqual([]);
+    expect(await page.locator('main').innerHTML()).toBe(before);expect(requests).toEqual(wordRequests);expect(errors).toEqual([]);
     await page.keyboard.press('Escape');
     expect(await reader(page,`function(){return this.querySelector('.definition').hidden}`)).toBe(true);
     expect(await reader(page,`function(){return this.activeElement?.dataset.surface}`)).toBe('読ん');
@@ -76,13 +80,15 @@ test('all local tools work offline and an edit clears the old exploration',async
     await expect.poll(()=>reader(page,`function(){return this.querySelector('.meaning-forks')?.textContent}`)).toContain('Potential');
     expect(await reader(page,`function(){return this.querySelector('.explore-source rt')?.textContent}`)).toBe('た');
     await reader(page,`function(){this.querySelectorAll('[data-surface="食べ"]')[1].click();this.querySelector('.explore-toggle').click()}`);
+    await expect.poll(()=>reader(page,`function(){return this.querySelector('.definition-body')?.getAttribute('aria-busy')}`)).toBe('false');
+    const wordRequests=requests.slice();
     await reader(page,`function(){Array.from(this.querySelectorAll('.explore-tools button')).find(button=>button.textContent==='Meaning Forks')?.click()}`);
     expect(await reader(page,`function(){return this.querySelector('.meaning-traits')?.textContent}`)).toBe('Past form · Affirmative form · Polite ending');
     expect(await reader(page,`function(){return this.querySelector('.explore-source')?.textContent}`)).toContain('させました');
     await page.locator('#line-2').evaluate(el=>{el.textContent='学校へ行く。';});
     await expect.poll(()=>reader(page,`function(){return this.querySelector('.definition').hidden}`)).toBe(true);
     expect(await reader(page,`function(){return this.querySelector('.explore-panel')}`)).toBeNull();
-    expect(requests).toEqual([]);
+    expect(requests).toEqual(wordRequests);
     const saved=await context.serviceWorkers()[0].evaluate(async()=>chrome.storage.local.get(null));
     expect(Object.keys(saved).sort()).toEqual(['enabled','excluded','readingOverrides','readingView']);
   } finally {await context.setOffline(false);await page.close();}
@@ -126,6 +132,7 @@ test('mimetic catalog, new page expressions, and attested rain alias stay local'
   const page=await context.newPage();
   try {
     await page.goto(base);await open(page,'ザーザー');
+    const wordRequests=requests.slice();
     expect(await reader(page,`function(){return this.querySelector('.mimetic-term')?.textContent}`)).toBe('ざあざあ');
     await browse(page);
     await reader(page,`function(){Array.from(this.querySelectorAll('[role="tab"]')).find(button=>button.textContent==='Mimetics').click()}`);
@@ -137,7 +144,7 @@ test('mimetic catalog, new page expressions, and attested rain alias stay local'
     await page.emulateMedia({reducedMotion:'reduce'});await page.setViewportSize({width:320,height:760});
     expect(await reader(page,`function(){const panel=this.querySelector('.definition');return panel.scrollWidth<=panel.clientWidth}`)).toBe(true);
     await page.screenshot({path:test.info().outputPath('playground-browser-integrated.png')});
-    expect(requests).toEqual([]);
+    expect(requests).toEqual(wordRequests);
   } finally {await page.close();}
 });
 
@@ -183,9 +190,10 @@ test('Docs fixture carries morphology into local tools without changing its sour
     await page.route(url,route=>route.fulfill({contentType:'text/html',body:`<!doctype html><meta charset="utf-8"><style>body{margin:0}.kix-appview-editor{position:absolute;top:100px;width:900px;height:650px}</style><div class="kix-appview-editor"><svg width="900" height="600">${text.map((line,i)=>`<g data-font-css="24px system-ui"><rect x="40" y="${60+i*60}" width="${line.length*24}" height="28" aria-label="${line}" fill="transparent"/></g>`).join('')}</svg></div>`}));
     await page.goto(url);const before=await page.locator('.kix-appview-editor').innerHTML();
     await open(page,'読ん');await expect.poll(()=>reader(page,plainResult)).toBe('読んでいませんでした');
+    const wordRequests=requests.slice();
     await reader(page,`function(){this.querySelectorAll('.verb-controls input')[0].click()}`);
     expect(await reader(page,plainResult)).toBe('読んでいません');
-    expect(await page.locator('.kix-appview-editor').innerHTML()).toBe(before);expect(requests).toEqual([]);
+    expect(await page.locator('.kix-appview-editor').innerHTML()).toBe(before);expect(requests).toEqual(wordRequests);
   } finally {await page.close();}
 });
 

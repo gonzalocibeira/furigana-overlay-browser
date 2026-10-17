@@ -265,6 +265,9 @@ export function potentialBaseQueries(base:VerbBase):string[] {
 /** A verified ら抜き spelling is outside this playground's standard-form scope. */
 export function isRaDroppedPotential(source:VerbBase,query:string,words:Word[]):boolean {
   if(!potentialBaseQueries(source).includes(query))return false;
+  // いれる is also the ordinary lexical verb 入れる. Its exact kana spelling
+  // must remain available even though it overlaps a shortened potential of いる.
+  if(source.lemma==='いれる' && source.reading==='いれる')return false;
   for(const candidate of dictionaryVerbCandidates(query,words)) {
     if(candidate.prefix || (candidate.verbClass!=='一段' && !isKuru(candidate)))continue;
     const stem=elementary(candidate,'Negative');
@@ -277,7 +280,9 @@ export function resolvePotentialBase(source:VerbBase,query:string,words:Word[]):
   if(!potentialBaseQueries(source).includes(query))return;
   for(const candidate of dictionaryVerbCandidates(query,words)) {
     if(candidate.prefix || !godan.has(candidate.verbClass))continue;
-    const potential=derived(candidate,'potential',false);
-    if(potential.lemma===source.lemma && potential.reading===source.reading)return candidate;
+    // Verify a supported form, including lexical restrictions such as ある;
+    // a mechanically possible spelling alone must not restrict a homograph.
+    const potential=formsFor(candidate).find(form=>form.family==='potential' && !form.past && !form.negative && !form.polite && !form.spoken);
+    if(potential?.text===source.lemma && potential.reading===source.reading)return candidate;
   }
 }

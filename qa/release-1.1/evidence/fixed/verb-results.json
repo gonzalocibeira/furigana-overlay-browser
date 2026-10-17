@@ -1,0 +1,14 @@
+{
+  "kana": {
+    "feedback": "Confirm the dictionary form, reading, and class to begin.",
+    "choices": [
+      "Use いれる · いれる · Ichidan"
+    ]
+  },
+  "kanji": {
+    "feedback": "Confirm the dictionary form, reading, and class to begin.",
+    "choices": [
+      "Use 入れる · いれる · Ichidan"
+    ]
+  }
+}

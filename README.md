@@ -5,7 +5,7 @@
 <h1 align="center">Kō — Japanese Reading Companion</h1>
 <p align="center"><strong>Japanese reading companion.</strong></p>
 <p align="center">Automatic Japanese readings for webpages and Google Docs.<br>Furigana runs on your device. Optional word definitions use Wiktionary online.</p>
-<p align="center">Source candidate <strong>1.1.0</strong> · Published store release <strong>1.0.0</strong></p>
+<p align="center"><a href="https://github.com/gonzalocibeira/ko-japanese-reading-companion/releases/tag/v1.1.0">GitHub release <strong>1.1.0</strong></a> · 17 October 2026</p>
 <p align="center">
   <a href="https://chromewebstore.google.com/detail/khhdlbblmannlpbkmhmppakldpjhaiok">Install from the Chrome Web Store</a> ·
   <a href="#see-it-in-action">See it in action</a> ·
@@ -25,19 +25,20 @@
 
 ## Release notes
 
-### 1.1.0 · Local release candidate
+### 1.1.0 · 17 October 2026
 
 - **Verb Playground.** Choose a form family, including potential, passive, causative, desire, conditionals, requests, commands, and everyday ～て constructions. Applicable Past, Negative, Polite, and Spoken shortening switches update the form, furigana, and highlighted changes. Reset restores the exact original. Ambiguous forms offer explicit choices.
 - **Mimetic Playground.** Explore 60 expressions through 30 original illustrated comparisons covering feelings, bodily states, movement, people, texture, sound, light, and weather. Each expression has a Japanese example, translation, reference, and notes about other uses. Replay runs a short animation; reduced-motion settings keep it still.
 - **Offline playground workspace.** Enter a dictionary-form verb directly, or click a verb in the reading panel to open its playground. The Mimetic tab lets you search all 60 expressions. No account or connection is needed.
 - **Meaning Forks.** Compare common potential/passive/honorific functions of supported ～られる forms, or make/let functions of causatives. Role diagrams explain the possibilities while the original phrase stays visible. Context determines which function fits.
-- **Local word details.** Clicking a word opens readings, corrections, and available exploration without a request. Choose **Look up definitions online** to request English and Japanese Wiktionary definitions. Loaded definitions can be redisplayed from memory.
+- **One-click word meanings.** Clicking a word automatically loads English and Japanese Wiktionary definitions alongside readings, corrections, and available local exploration. Loaded definitions can be redisplayed from memory; failed lookups offer a retry button.
+- **Reading reliability.** Concurrent saves preserve corrections and site preferences. Hidden text and closed disclosures no longer produce stray furigana, and lexical kana verbs such as いれる remain available in the playground.
 
-The rebuilt [`dist/`](dist/) contains this candidate. It has not been uploaded to the Chrome Web Store. No new permissions, runtime services, accounts, API keys, or learning-history storage are introduced. See [exploration notes](docs/exploration-notes.md) for supported forms and linguistic limits.
+Download [Kō 1.1.0 from GitHub](https://github.com/gonzalocibeira/ko-japanese-reading-companion/releases/tag/v1.1.0), or use the ready-to-load [`dist/`](dist/) folder. Chrome Web Store submission and availability are managed separately. No new permissions, runtime services, accounts, API keys, or learning-history storage are introduced. See [exploration notes](docs/exploration-notes.md) for supported forms and linguistic limits.
 
-**About Kō → What’s new** shows the current release notes and links to the full offline history. The build also prepares a [GitHub release draft](dist/docs/github-release-1.1.0.md) from the same [changelog](docs/release-notes.md); it does not create or publish a GitHub release.
+**About Kō → What’s new** shows the current release notes and links to the full offline history. The [GitHub release](https://github.com/gonzalocibeira/ko-japanese-reading-companion/releases/tag/v1.1.0), bundled About page, and offline history use the same [changelog](docs/release-notes.md).
 
-Current verification: build and typecheck pass, with 136 of 137 automated checks passing. The native toolbar-popup check is currently blocked by macOS browser-window activation; it passed on the preceding UI candidate, and popup code is unchanged. Integrated UI checks cover 280–720 px panels, short windows, readable switch labels, single-area scrolling, and back navigation. A live smoke check passed on a public, read-only Google Doc; live editing was not exercised. See the [release audit](docs/chrome-web-store-audit.md) for evidence.
+Current verification: build and typecheck pass, with all 147 automated checks and three release-audit regressions passing. The native toolbar-popup check verifies full-height opening and wheel access to footer links. Integrated UI checks cover 280–720 px panels, short windows, readable switch labels, single-area scrolling, and back navigation. Release fixes cover concurrent saves, hidden/collapsed text, and lexical kana verbs. A prior live smoke check passed on a public, read-only Google Doc; live editing was not exercised. See the [release audit](docs/chrome-web-store-audit.md) for evidence.
 
 ### 1.0.0 · 14 October 2026
 
@@ -55,13 +56,15 @@ Read the [full release notes](docs/release-notes.md) for details and update inst
 
 **[Install Kō from the Chrome Web Store](https://chromewebstore.google.com/detail/khhdlbblmannlpbkmhmppakldpjhaiok).** Click **Add to Chrome**, confirm the installation, then reload your open tabs to start reading. Store installations receive updates automatically.
 
+For the exact **1.1.0** version published on GitHub, use the manual download below. GitHub releases and Chrome Web Store updates are separate distributions.
+
 **Tip:** Pin **Kō — Japanese Reading Companion** from Chrome's puzzle-piece **Extensions** menu. Look for the warm-paper **考** (think) on a vermilion seal.
 
 ### Manual installation
 
 You can also load the ready-to-use extension from [`dist/`](dist/). No Node.js, npm, or build step needed.
 
-1. **Download the [1.0.0 extension ZIP](https://github.com/gonzalocibeira/ko-japanese-reading-companion/releases/download/v1.0.0/ko-japanese-reading-companion-1.0.0.zip).** It contains the ready-to-load `dist` folder. You can also download the full source from [the repository](https://github.com/gonzalocibeira/ko-japanese-reading-companion) using **Code → Download ZIP**.
+1. **Download the [1.1.0 extension ZIP](https://github.com/gonzalocibeira/ko-japanese-reading-companion/releases/download/v1.1.0/ko-japanese-reading-companion-1.1.0.zip).** It contains the ready-to-load `dist` folder. You can also download the full source from [the repository](https://github.com/gonzalocibeira/ko-japanese-reading-companion) using **Code → Download ZIP**. Release assets include [SHA-256 checksums](https://github.com/gonzalocibeira/ko-japanese-reading-companion/releases/download/v1.1.0/SHA256SUMS).
 2. **Extract and keep the folder.** Put it somewhere permanent, such as `Documents/Ko`.
 3. **Open Chrome's extensions page.** Enter `chrome://extensions` in the address bar and turn on **Developer mode**.
 4. **Load the extension.** Click **Load unpacked** and select the extracted folder containing `manifest.json`. For a repository/source download, this is the **`dist` folder**. A `chrome-web-store.zip` package has `manifest.json` directly in its extracted root.
@@ -71,7 +74,7 @@ You can also load the ready-to-use extension from [`dist/`](dist/). No Node.js, 
 <summary><strong>Which folder should I select?</strong></summary>
 
 ```text
-ko-japanese-reading-companion-1.0.0/
+ko-japanese-reading-companion-1.1.0/
 └── dist/                  ← Select this folder in “Load unpacked”
     ├── manifest.json
     ├── content.js
@@ -82,7 +85,7 @@ ko-japanese-reading-companion-1.0.0/
 
 Select the extracted folder containing `manifest.json`, not the ZIP or repository root. Keep that folder in place and leave Developer mode enabled. Managed work or school browsers may restrict unpacked extensions.
 
-The diagram shows a repository/source download. When using the locally built `ko-japanese-reading-companion-1.1.0-chrome-web-store.zip` candidate, select the extracted package folder itself. The public 1.0.0 download does not include the new 1.1 playgrounds.
+The manual-install ZIP and repository/source downloads both contain a `dist` folder. The separate `ko-japanese-reading-companion-1.1.0-chrome-web-store.zip` asset is intended for store submission and has `manifest.json` directly at its root; if loading that package manually, select its extracted root instead.
 
 See [Chrome's official instructions for loading unpacked extensions](https://developer.chrome.com/docs/extensions/get-started/tutorial/hello-world#load-unpacked).
 
@@ -127,15 +130,15 @@ The panel follows visible webpage text, or the active Docs page, after scrolling
 
 ### Look up a word
 
-Click a word in the reading panel to see its reading and available local tools. Choose **Look up definitions online** for English and Japanese definitions. For inflected words, the card also shows the dictionary form used for lookup. Supported verbs offer **Try verb forms**; words with several tools offer **Open playgrounds** for Verb Playground, Mimetic Playground, or Meaning Forks; these tools require no internet connection.
+Click a word in the reading panel to automatically see its English and Japanese definitions, reading, and available local tools. For inflected words, the card also shows the dictionary form used for lookup. Supported verbs offer **Try verb forms**; words with several tools offer **Open playgrounds** for Verb Playground, Mimetic Playground, or Meaning Forks; these tools require no internet connection.
 
 The **Playgrounds** button opens a full-height workspace without selecting a page word. In **Verbs**, enter a dictionary-form verb such as 書く and confirm its local analysis, or click a verb in the reading panel to open its playground. There is no preset verb list. Use **← Change verb** to return to input. In **Mimetics**, search the sixty expressions by Japanese, reading, or English and filter by category; **← Examples** restores your list position. **← Reading view** returns to your reading position. Experiments and typed verbs remain in memory; the source page is never rewritten. Preview the [verb input](docs/screenshots/playgrounds-verb-input-1.1.png), [Verb Playground](docs/screenshots/playgrounds-verb-1.1.png), and [Mimetic Playground](docs/screenshots/playgrounds-mimetic-1.1.png) layouts.
 
 ![Google Docs beside the reading panel, with 海賊 selected and its reading かいぞく, English and Japanese definitions, and Wiktionary source links visible](docs/screenshots/google-docs-dictionary-live.png)
 
-Here, **海賊** has the reading **かいぞく** and the meaning **pirate**, with definitions in both languages below the reading text. In 1.1, choose the online lookup button to load those definitions. The original Google Doc stays visible beside the panel. Follow either Wiktionary source link to read the full entry.
+Here, **海賊** has the reading **かいぞく** and the meaning **pirate**, with definitions in both languages loaded automatically when clicked. The original Google Doc stays visible beside the panel. Follow either Wiktionary source link to read the full entry.
 
-Definitions come from the English and Japanese editions of Wiktionary and require an internet connection. Only choosing the online lookup button sends the selected word's dictionary form; opening word details or local playgrounds makes no request. Each language shows its own unavailable or missing-entry message when necessary. Failed lookups offer **Retry definitions online**.
+Definitions come from the English and Japanese editions of Wiktionary and require an internet connection. Activating a word sends only its dictionary form; cached definitions can be shown without another request. Opening the Playgrounds browser and using exploration controls makes no definition requests. Each language shows its own unavailable or missing-entry message when necessary. Failed lookups offer **Retry definitions online**.
 
 You can also focus a word with Tab and open it with Enter or Space. Exploration switches, comparison buttons, and Replay work with the keyboard. Press Escape or the word card's **×** button to dismiss it and return to reading.
 
@@ -166,14 +169,14 @@ Open **About Kō** from the popup or Chrome’s extension options for the projec
 
 **Furigana readings run on your device.** The extension uses bundled Kuromoji/IPADIC reading dictionaries and sends no text to an external service to generate furigana.
 
-**Word definitions use Wiktionary online.** Choosing **Look up definitions online** sends that word's dictionary form to the English and Japanese Wiktionary services. Wiktionary receives the lookup word and normal connection information, including your IP address. The extension does not send the surrounding sentence or full document. Lookups require an internet connection; cached definitions stay in extension memory. Furigana and all exploration tools run locally, and experiments are not saved.
+**Word definitions use Wiktionary online.** Clicking a word in the reading panel, or activating it with Enter or Space, automatically sends that word's dictionary form to the English and Japanese Wiktionary services. Wiktionary receives the lookup word and normal connection information, including your IP address. The extension does not send the surrounding sentence or full document. Lookups require an internet connection; cached definitions stay in extension memory. Furigana and all exploration tools run locally, and experiments are not saved.
 
 The extension has no analytics or account requirement. It saves only your settings and reading corrections to local storage.
 
 <details>
 <summary><strong>Permissions and local storage explained</strong></summary>
 
-Japanese readings are processed locally with bundled Kuromoji/IPADIC dictionaries in an extension worker. No runtime dictionary download is needed for readings. The explicit online lookup button requests definitions from `en.wiktionary.org` and `ja.wiktionary.org`, without credentials or a referrer. Definitions are cached in memory for up to 100 words per panel and are not saved to local storage. Wiktionary receives the requested word and the normal connection information, including your IP address. Exploration uses bundled code and original artwork; it makes no requests and saves no history.
+Japanese readings are processed locally with bundled Kuromoji/IPADIC dictionaries in an extension worker. No runtime dictionary download is needed for readings. Activating a reading-panel word automatically requests definitions from `en.wiktionary.org` and `ja.wiktionary.org`, without credentials or a referrer. Definitions are cached in memory for up to 100 words per panel and are not saved to local storage. Wiktionary receives the requested word and the normal connection information, including your IP address. Exploration uses bundled code and original artwork; it makes no requests and saves no history.
 
 - The extension needs access to HTTP/HTTPS pages to add readings automatically without a per-page click. You can narrow access using Chrome's extension site-access controls; it will only run on permitted sites.
 - It requests local storage for preferences and user-entered corrections, plus an offscreen document for the tokenizer worker.
@@ -245,9 +248,11 @@ npm run typecheck
 npm test
 ```
 
+For release downloads, run `npm run package:release`. It rebuilds `dist`, creates a manual-install ZIP containing `dist/`, creates the store ZIP with `manifest.json` at its root, and writes `SHA256SUMS`. Both ZIPs use the same runtime allowlist and exclude source maps, tests, screenshots, and development documentation. Packaging does not publish to GitHub or the Chrome Web Store.
+
 `npm run build` regenerates the included `dist/` folder. Development dependency installation requires internet access. Furigana readings require no external service; optional word definitions contact Wiktionary and require an internet connection.
 
-The test suite covers automatic annotations, unchanged source/layout, a 100,000-node webpage, a 100-page Docs fixture, cancellation, IME handling, settings, corrections, vocabulary/name disambiguation, local exploration and real-dictionary form round trips, keyboard and reduced-motion behavior, the reading panel, debounced refreshes, explicit bilingual word definitions, toolbar state and lifecycle, and expanded popup forms. Browser integration tests use a temporary profile and localhost server. The native toolbar-popup regression opens a temporary visible browser window to verify Chrome’s popup sizing and wheel scrolling. They default to Brave's standard macOS executable; set `CHROMIUM_PATH` to an extension-capable Chromium executable elsewhere. Chrome distributions that disable command-line extension loading cannot run these integration tests. Your normal browser profile and Google account are not used.
+The test suite covers automatic annotations, unchanged source/layout, a 100,000-node webpage, a 100-page Docs fixture, cancellation, IME handling, settings, corrections, vocabulary/name disambiguation, local exploration and real-dictionary form round trips, keyboard and reduced-motion behavior, the reading panel, debounced refreshes, automatic bilingual word definitions on word activation, toolbar state and lifecycle, and expanded popup forms. Browser integration tests use a temporary profile and localhost server. The native toolbar-popup regression opens a temporary visible browser window to verify Chrome’s popup sizing and wheel scrolling. They default to Brave's standard macOS executable; set `CHROMIUM_PATH` to an extension-capable Chromium executable elsewhere. Chrome distributions that disable command-line extension loading cannot run these integration tests. Your normal browser profile and Google account are not used.
 
 The four inline 1.0 screenshots supplied by the project owner cover webpage overlays, Google Docs overlays, the reading panel, and bilingual word definitions. Linked 1.1 playground previews were captured during a live public read-only Google Docs smoke test. Earlier fixture captures remain in [`docs/screenshots/`](docs/screenshots/). Regenerated browser captures are written to `test-results/` during tests.
 
@@ -256,7 +261,7 @@ The four inline 1.0 screenshots supplied by the project owner cover webpage over
 <details>
 <summary><strong>Performance and architecture</strong></summary>
 
-Furigana work is bounded to visible content. Reading analysis pauses in background tabs, waits for scrolling/editing to settle, and cancels stale queued work. Docs measurements are cached within each scan; collision checks inspect nearby glyphs. Reading caches and analysis batches have fixed limits. The reading panel is capped at 16,000 characters / 2,000 runs and 500 reading candidates. Typed verbs use a separate bounded local analysis channel. Only **Look up definitions online** sends a definition request; up to 100 lookup results are cached in panel memory.
+Furigana work is bounded to visible content. Reading analysis pauses in background tabs, waits for scrolling/editing to settle, and cancels stale queued work. Docs measurements are cached within each scan; collision checks inspect nearby glyphs. Reading caches and analysis batches have fixed limits. The reading panel is capped at 16,000 characters / 2,000 runs and 500 reading candidates. Typed verbs use a separate bounded local analysis channel. Activating a word automatically requests its definitions; up to 100 lookup results are cached in panel memory.
 
 See [technical notes](docs/technical-notes.md) for the architecture, exact budgets, and compatibility details.
 

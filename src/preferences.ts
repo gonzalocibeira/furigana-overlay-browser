@@ -52,23 +52,36 @@ export function readingViewPreferences(value:unknown,legacy?:unknown):ReadingVie
   return {sites,spacing:docsReadingView({spacing:v?.spacing ?? old.spacing}).spacing,fontSize:panelFontSizes.includes(v?.fontSize ?? 0)?v!.fontSize!:20,width:typeof v?.width==='number' && Number.isFinite(v.width)?Math.max(280,Math.min(720,v.width)):420};
 }
 export function panelEnabled(settings:ReadingViewPreferences,hostname:string) {return Object.hasOwn(settings.sites,hostname) && settings.sites[hostname]===true;}
-export async function updateReadingView(patch:Partial<Omit<ReadingViewPreferences,'sites'>>,site?:{hostname:string;enabled:boolean}) {
-  const state=await chrome.storage.local.get(['readingView','docsReadingView']);
-  const current=readingViewPreferences(state.readingView,state.docsReadingView);
-  const next=readingViewPreferences({...current,...patch,sites:site?{...current.sites,[site.hostname]:site.enabled}:current.sites});
-  await chrome.storage.local.set({readingView:next});return next;
+export type PreferenceMutation =
+  | {kind:'reading-view';patch:Partial<Omit<ReadingViewPreferences,'sites'>>;site?:{hostname:string;enabled:boolean}}
+  | {kind:'save-correction';word:string;reading:string;previousWord?:string}
+  | {kind:'remove-correction';word:string}
+  | {kind:'import-corrections';json:string}
+  | {kind:'pause-site';hostname:string;paused:boolean}
+  | {kind:'site-appearance';hostname:string;patch:Partial<Appearance>};
+async function mutatePreferences<T>(mutation:PreferenceMutation):Promise<T> {
+  // One service-worker writer coordinates all tabs and popup windows.
+  const reply:{value?:T;error?:string}|undefined=await chrome.runtime.sendMessage({type:'mutate-preferences',mutation});
+  if(!reply || reply.error || !Object.hasOwn(reply,'value'))throw new Error(reply?.error ?? 'Could not save the preference. Try again.');
+  return reply.value as T;
 }
-export async function saveCorrection(word:string,reading:string,previousWord?:string) {
-  const correction=validateOverride(word,reading);
-  const state=await chrome.storage.local.get({readingOverrides:{}}),values=validOverrides(state.readingOverrides);
-  if(previousWord && previousWord!==correction.word)delete values[previousWord];
-  if(!Object.hasOwn(values,correction.word) && Object.keys(values).length>=200)throw new Error('You have 200 corrections. Remove one before adding another.');
-  values[correction.word]=correction.reading;
-  await chrome.storage.local.set({readingOverrides:values});return values;
+export function updateReadingView(patch:Partial<Omit<ReadingViewPreferences,'sites'>>,site?:{hostname:string;enabled:boolean}) {
+  return mutatePreferences<ReadingViewPreferences>({kind:'reading-view',patch,site});
 }
-export async function removeCorrection(word:string) {
-  const state=await chrome.storage.local.get({readingOverrides:{}}),values=validOverrides(state.readingOverrides);
-  delete values[word];await chrome.storage.local.set({readingOverrides:values});return values;
+export function saveCorrection(word:string,reading:string,previousWord?:string) {
+  return mutatePreferences<Record<string,string>>({kind:'save-correction',word,reading,previousWord});
+}
+export function removeCorrection(word:string) {
+  return mutatePreferences<Record<string,string>>({kind:'remove-correction',word});
+}
+export function importCorrections(json:string) {
+  return mutatePreferences<ReturnType<typeof mergeCorrectionBackup>>({kind:'import-corrections',json});
+}
+export function pauseSite(hostname:string,paused:boolean) {
+  return mutatePreferences<string[]>({kind:'pause-site',hostname,paused});
+}
+export function updateSiteAppearance(hostname:string,patch:Partial<Appearance>) {
+  return mutatePreferences<Appearance>({kind:'site-appearance',hostname,patch});
 }
 export const correctionBackupLimit=256*1024;
 export function mergeCorrectionBackup(json:string,existing:Record<string,string>) {

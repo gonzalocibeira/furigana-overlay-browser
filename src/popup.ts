@@ -1,4 +1,4 @@
-import {appearanceForSite,validOverrides,readingViewPreferences,panelEnabled,updateReadingView,saveCorrection,removeCorrection,mergeCorrectionBackup,correctionBackupLimit,correctionMatches} from './preferences';
+import {appearanceForSite,validOverrides,readingViewPreferences,panelEnabled,updateReadingView,saveCorrection,removeCorrection,importCorrections,pauseSite,updateSiteAppearance,correctionBackupLimit,correctionMatches} from './preferences';
 import {uiTheme} from './ui-theme';
 import type {PageStatus} from './action-state';
 const theme=document.createElement('style');theme.textContent=uiTheme;document.head.append(theme);
@@ -46,10 +46,7 @@ async function main() {
   };
   excluded.onchange = async () => {
     try {
-      const latest = await chrome.storage.local.get({excluded:[]});
-      const sites = new Set<string>(Array.isArray(latest.excluded) ? latest.excluded : []);
-      excluded.checked ? sites.add(hostname) : sites.delete(hostname);
-      await chrome.storage.local.set({excluded:[...sites]}); changed();
+      await pauseSite(hostname,excluded.checked); changed();
     } catch { show('Could not save the site preference. Reopen the menu and try again.','unavailable'); }
   };
   const viewEnabled=document.querySelector<HTMLInputElement>('#view-reading-enabled')!;
@@ -74,17 +71,14 @@ async function main() {
   size.value=String(initial.scale);contrast.value=initial.contrast;
   size.disabled=contrast.disabled=!hostname;
   document.querySelector('#appearance-site')!.textContent=hostname?`Saved for ${hostname}.`:'Open a website to customize its readings.';
-  async function saveAppearance() {
+  async function saveAppearance(event:Event) {
     const feedback=document.querySelector<HTMLElement>('#appearance-feedback')!;
     try {
-      const latest=await chrome.storage.local.get({siteAppearance:{}});
-      const sites=latest.siteAppearance && typeof latest.siteAppearance==='object'?{...latest.siteAppearance as Record<string,unknown>}:{};
-      sites[hostname]={scale:Number(size.value),contrast:contrast.value};
-      await chrome.storage.local.set({siteAppearance:sites});
+      await updateSiteAppearance(hostname,event.target===size?{scale:Number(size.value)}:{contrast:contrast.value==='high'?'high':'auto'});
       feedback.textContent='Saved for this site.';feedback.dataset.error='false';changed();
     } catch {feedback.textContent='Could not save. Try again.';feedback.dataset.error='true';}
   }
-  size.onchange=contrast.onchange=()=>void saveAppearance();
+  size.onchange=contrast.onchange=event=>void saveAppearance(event);
   const word=document.querySelector<HTMLInputElement>('#correction-word')!;
   const reading=document.querySelector<HTMLInputElement>('#correction-reading')!;
   const form=document.querySelector<HTMLFormElement>('#correction-form')!;
@@ -132,6 +126,9 @@ async function main() {
     if(changes.excluded)excluded.checked=Array.isArray(changes.excluded.newValue) && changes.excluded.newValue.includes(hostname);
     if(changes.enabled || changes.excluded)changed();
     if(changes.readingOverrides)renderCorrections(validOverrides(changes.readingOverrides.newValue));
+    if(changes.siteAppearance) {
+      const next=appearanceForSite(changes.siteAppearance.newValue,hostname);size.value=String(next.scale);contrast.value=next.contrast;
+    }
     if(changes.readingView) {
       const view=readingViewPreferences(changes.readingView.newValue,state.docsReadingView);
       viewEnabled.checked=panelEnabled(view,hostname);spacing.value=String(view.spacing);fontSize.value=String(view.fontSize);
@@ -154,9 +151,7 @@ async function main() {
     const selected=file.files?.[0];if(!selected)return;
     try {
       if(selected.size>correctionBackupLimit)throw new Error('Choose a backup smaller than 256 KiB.');
-      const json=await selected.text(),latest=await chrome.storage.local.get({readingOverrides:{}});
-      const result=mergeCorrectionBackup(json,validOverrides(latest.readingOverrides));
-      await chrome.storage.local.set({readingOverrides:result.values});renderCorrections(result.values);
+      const result=await importCorrections(await selected.text());renderCorrections(result.values);
       report(`Imported ${result.added} corrections; skipped ${result.skipped} existing words.`);changed();
     } catch(error) {report(error instanceof Error?error.message:'Could not import corrections.',true);}
     finally {file.value='';}

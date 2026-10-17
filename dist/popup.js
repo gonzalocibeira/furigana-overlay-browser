@@ -68,55 +68,28 @@
   function panelEnabled(settings, hostname) {
     return Object.hasOwn(settings.sites, hostname) && settings.sites[hostname] === true;
   }
-  async function updateReadingView(patch, site) {
-    const state = await chrome.storage.local.get(["readingView", "docsReadingView"]);
-    const current = readingViewPreferences(state.readingView, state.docsReadingView);
-    const next = readingViewPreferences({ ...current, ...patch, sites: site ? { ...current.sites, [site.hostname]: site.enabled } : current.sites });
-    await chrome.storage.local.set({ readingView: next });
-    return next;
+  async function mutatePreferences(mutation) {
+    const reply = await chrome.runtime.sendMessage({ type: "mutate-preferences", mutation });
+    if (!reply || reply.error || !Object.hasOwn(reply, "value")) throw new Error(reply?.error ?? "Could not save the preference. Try again.");
+    return reply.value;
   }
-  async function saveCorrection(word, reading, previousWord) {
-    const correction = validateOverride(word, reading);
-    const state = await chrome.storage.local.get({ readingOverrides: {} }), values = validOverrides(state.readingOverrides);
-    if (previousWord && previousWord !== correction.word) delete values[previousWord];
-    if (!Object.hasOwn(values, correction.word) && Object.keys(values).length >= 200) throw new Error("You have 200 corrections. Remove one before adding another.");
-    values[correction.word] = correction.reading;
-    await chrome.storage.local.set({ readingOverrides: values });
-    return values;
+  function updateReadingView(patch, site) {
+    return mutatePreferences({ kind: "reading-view", patch, site });
   }
-  async function removeCorrection(word) {
-    const state = await chrome.storage.local.get({ readingOverrides: {} }), values = validOverrides(state.readingOverrides);
-    delete values[word];
-    await chrome.storage.local.set({ readingOverrides: values });
-    return values;
+  function saveCorrection(word, reading, previousWord) {
+    return mutatePreferences({ kind: "save-correction", word, reading, previousWord });
   }
-  function mergeCorrectionBackup(json, existing) {
-    if (new TextEncoder().encode(json).length > correctionBackupLimit) throw new Error("Choose a backup smaller than 256 KiB.");
-    let data;
-    try {
-      data = JSON.parse(json);
-    } catch {
-      throw new Error("This file is not valid JSON.");
-    }
-    if (!data || data.version !== 1 || !data.corrections || typeof data.corrections !== "object" || Array.isArray(data.corrections)) throw new Error("Choose a version 1 correction backup.");
-    const imported = {};
-    for (const [word, reading] of Object.entries(data.corrections)) {
-      if (typeof reading !== "string") throw new Error("The backup contains an invalid correction.");
-      const valid = validateOverride(word, reading);
-      if (Object.hasOwn(imported, valid.word) && imported[valid.word] !== valid.reading) throw new Error("The backup contains conflicting normalized words.");
-      imported[valid.word] = valid.reading;
-    }
-    const values = { ...existing };
-    let added = 0, skipped = 0;
-    for (const [word, reading] of Object.entries(imported)) {
-      if (Object.hasOwn(values, word)) skipped++;
-      else {
-        values[word] = reading;
-        added++;
-      }
-    }
-    if (Object.keys(values).length > 200) throw new Error("This import would exceed 200 corrections. Remove some corrections and try again.");
-    return { values, added, skipped };
+  function removeCorrection(word) {
+    return mutatePreferences({ kind: "remove-correction", word });
+  }
+  function importCorrections(json) {
+    return mutatePreferences({ kind: "import-corrections", json });
+  }
+  function pauseSite(hostname, paused) {
+    return mutatePreferences({ kind: "pause-site", hostname, paused });
+  }
+  function updateSiteAppearance(hostname, patch) {
+    return mutatePreferences({ kind: "site-appearance", hostname, patch });
   }
   function correctionMatches(word, reading, query) {
     const normalized = hiragana(query.trim().normalize("NFKC")).toLocaleLowerCase();
@@ -227,10 +200,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
         };
         excluded.onchange = async () => {
           try {
-            const latest = await chrome.storage.local.get({ excluded: [] });
-            const sites = new Set(Array.isArray(latest.excluded) ? latest.excluded : []);
-            excluded.checked ? sites.add(hostname) : sites.delete(hostname);
-            await chrome.storage.local.set({ excluded: [...sites] });
+            await pauseSite(hostname, excluded.checked);
             changed();
           } catch {
             show("Could not save the site preference. Reopen the menu and try again.", "unavailable");
@@ -266,13 +236,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
         contrast.value = initial.contrast;
         size.disabled = contrast.disabled = !hostname;
         document.querySelector("#appearance-site").textContent = hostname ? `Saved for ${hostname}.` : "Open a website to customize its readings.";
-        async function saveAppearance() {
+        async function saveAppearance(event) {
           const feedback2 = document.querySelector("#appearance-feedback");
           try {
-            const latest = await chrome.storage.local.get({ siteAppearance: {} });
-            const sites = latest.siteAppearance && typeof latest.siteAppearance === "object" ? { ...latest.siteAppearance } : {};
-            sites[hostname] = { scale: Number(size.value), contrast: contrast.value };
-            await chrome.storage.local.set({ siteAppearance: sites });
+            await updateSiteAppearance(hostname, event.target === size ? { scale: Number(size.value) } : { contrast: contrast.value === "high" ? "high" : "auto" });
             feedback2.textContent = "Saved for this site.";
             feedback2.dataset.error = "false";
             changed();
@@ -281,7 +248,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
             feedback2.dataset.error = "true";
           }
         }
-        size.onchange = contrast.onchange = () => void saveAppearance();
+        size.onchange = contrast.onchange = (event) => void saveAppearance(event);
         const word = document.querySelector("#correction-word");
         const reading = document.querySelector("#correction-reading");
         const form = document.querySelector("#correction-form");
@@ -370,6 +337,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
           if (changes.excluded) excluded.checked = Array.isArray(changes.excluded.newValue) && changes.excluded.newValue.includes(hostname);
           if (changes.enabled || changes.excluded) changed();
           if (changes.readingOverrides) renderCorrections(validOverrides(changes.readingOverrides.newValue));
+          if (changes.siteAppearance) {
+            const next = appearanceForSite(changes.siteAppearance.newValue, hostname);
+            size.value = String(next.scale);
+            contrast.value = next.contrast;
+          }
           if (changes.readingView) {
             const view2 = readingViewPreferences(changes.readingView.newValue, state.docsReadingView);
             viewEnabled.checked = panelEnabled(view2, hostname);
@@ -401,9 +373,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
           if (!selected) return;
           try {
             if (selected.size > correctionBackupLimit) throw new Error("Choose a backup smaller than 256 KiB.");
-            const json = await selected.text(), latest = await chrome.storage.local.get({ readingOverrides: {} });
-            const result = mergeCorrectionBackup(json, validOverrides(latest.readingOverrides));
-            await chrome.storage.local.set({ readingOverrides: result.values });
+            const result = await importCorrections(await selected.text());
             renderCorrections(result.values);
             report(`Imported ${result.added} corrections; skipped ${result.skipped} existing words.`);
             changed();

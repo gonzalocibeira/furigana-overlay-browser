@@ -1,0 +1,24 @@
+{
+  "date": "2026-10-17",
+  "build": "passed",
+  "typecheck": "passed",
+  "suite": {
+    "passed": 147,
+    "failed": 0,
+    "skipped": 0
+  },
+  "audit_regressions": {
+    "passed": 3,
+    "failed": 0
+  },
+  "native_popup": "passed unchanged regression",
+  "runtime_sha256": {
+    "popup.js": "2a723a9b75c1222cf98934957fd85fca6ebf689498f367a4652201165196d94f",
+    "about.js": "a384cc3b82ccdaa0d9f91746d202f04113fd2b77d005656c3f6642bbf2575d31",
+    "background.js": "2e69f7b03c8b5623cbda20681aa678af27a4c3d9c1117b816f68eb17e9fa2529",
+    "offscreen.js": "852419456d7dd7dff1ab28cbd810b108493514d60d1ee010354bea4438994d74",
+    "content.js": "60cfb4123c89fffa19ba2e25db35bd1ce8307ef2d33fe74244c7ae3f3eb8a60c",
+    "tokenizer.js": "cc23d7d40d382a9c977a2f11aa5bbcec5dad088d9cf057412c0180bddd4ccf27",
+    "docs-bridge.js": "b358fc0c18877105dafab0f5fe315f7f5695fe2a08788cdac2fab519644da0d4"
+  }
+}

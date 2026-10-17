@@ -122,27 +122,19 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
   function panelEnabled(settings, hostname) {
     return Object.hasOwn(settings.sites, hostname) && settings.sites[hostname] === true;
   }
-  async function updateReadingView(patch, site) {
-    const state = await chrome.storage.local.get(["readingView", "docsReadingView"]);
-    const current = readingViewPreferences(state.readingView, state.docsReadingView);
-    const next = readingViewPreferences({ ...current, ...patch, sites: site ? { ...current.sites, [site.hostname]: site.enabled } : current.sites });
-    await chrome.storage.local.set({ readingView: next });
-    return next;
+  async function mutatePreferences(mutation) {
+    const reply = await chrome.runtime.sendMessage({ type: "mutate-preferences", mutation });
+    if (!reply || reply.error || !Object.hasOwn(reply, "value")) throw new Error(reply?.error ?? "Could not save the preference. Try again.");
+    return reply.value;
   }
-  async function saveCorrection(word, reading, previousWord) {
-    const correction = validateOverride(word, reading);
-    const state = await chrome.storage.local.get({ readingOverrides: {} }), values = validOverrides(state.readingOverrides);
-    if (previousWord && previousWord !== correction.word) delete values[previousWord];
-    if (!Object.hasOwn(values, correction.word) && Object.keys(values).length >= 200) throw new Error("You have 200 corrections. Remove one before adding another.");
-    values[correction.word] = correction.reading;
-    await chrome.storage.local.set({ readingOverrides: values });
-    return values;
+  function updateReadingView(patch, site) {
+    return mutatePreferences({ kind: "reading-view", patch, site });
   }
-  async function removeCorrection(word) {
-    const state = await chrome.storage.local.get({ readingOverrides: {} }), values = validOverrides(state.readingOverrides);
-    delete values[word];
-    await chrome.storage.local.set({ readingOverrides: values });
-    return values;
+  function saveCorrection(word, reading, previousWord) {
+    return mutatePreferences({ kind: "save-correction", word, reading, previousWord });
+  }
+  function removeCorrection(word) {
+    return mutatePreferences({ kind: "remove-correction", word });
   }
   var panelFontSizes, correctionBackupLimit;
   var init_preferences = __esm({
@@ -636,6 +628,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
   }
   function isRaDroppedPotential(source, query, words) {
     if (!potentialBaseQueries(source).includes(query)) return false;
+    if (source.lemma === "\u3044\u308C\u308B" && source.reading === "\u3044\u308C\u308B") return false;
     for (const candidate of dictionaryVerbCandidates(query, words)) {
       if (candidate.prefix || candidate.verbClass !== "\u4E00\u6BB5" && !isKuru(candidate)) continue;
       const stem = elementary(candidate, "Negative");
@@ -648,8 +641,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
     if (!potentialBaseQueries(source).includes(query)) return;
     for (const candidate of dictionaryVerbCandidates(query, words)) {
       if (candidate.prefix || !godan.has(candidate.verbClass)) continue;
-      const potential = derived(candidate, "potential", false);
-      if (potential.lemma === source.lemma && potential.reading === source.reading) return candidate;
+      const potential = formsFor(candidate).find((form) => form.family === "potential" && !form.past && !form.negative && !form.polite && !form.spoken);
+      if (potential?.text === source.lemma && potential.reading === source.reading) return candidate;
     }
   }
   var finite, verbFamilies, godan, kana, japanese, helperLemmas, irregularLexemes, lexicalRestrictions, restrictedFamilies, isSuru, isKuru, potentialRows;
@@ -1760,7 +1753,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
       init_mimetic_playground();
       init_meaning_forks();
       explorationStyles = `
-.explore-toggle,.online-lookup{margin:8px 8px 0 0;font-size:11px}
+.explore-toggle,.definition-retry{margin:8px 8px 0 0;font-size:11px}
 .explore-panel{margin-top:12px;border:1px solid var(--line);padding:12px;background:var(--paper);min-width:0}
 .explore-panel[hidden]{display:none}.explore-tools{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
 .explore-tools button{margin:0;font-size:10px}.explore-tools button[aria-pressed=true]{background:var(--accent);color:var(--paper)}
@@ -1779,7 +1772,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
 .verb-result .verb-state{font-size:11px;color:var(--muted);margin:4px 0 0}
 .verb-reset{margin:0;padding:4px 8px;font-size:11px;background:var(--paper)}
 .explore-panel a{font-size:11px;overflow-wrap:anywhere}
-.explore-panel button:focus-visible,.explore-panel input:focus-visible,.explore-toggle:focus-visible,.online-lookup:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.explore-panel button:focus-visible,.explore-panel input:focus-visible,.explore-toggle:focus-visible,.definition-retry:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .verb-family-label{display:grid;gap:6px;font-size:12px;font-weight:600;margin:14px 0 0}
 .verb-family{width:100%;min-width:0;max-width:100%;font:13px/1.5 var(--body);padding:9px;background:var(--paper);color:var(--ink);border:1px solid var(--line)}
 .verb-explanation{color:var(--muted);font:12px/1.6 var(--body);margin:12px 0}
@@ -2190,14 +2183,14 @@ ${meaningForkStyles}
           this.root.innerHTML = `<style>${uiTheme}
 :host{all:initial!important;position:fixed!important;right:12px!important;top:var(--reader-top,100px)!important;bottom:12px!important;width:min(var(--reader-width,420px),calc(100vw - 24px))!important;z-index:2147483647!important;display:block!important;contain:layout style!important;color-scheme:light!important}
 :host(.playground-active){top:12px!important}
-.reader{height:100%;display:flex;flex-direction:column;background:var(--paper);color:var(--ink);border:2px solid var(--line);overflow:hidden;font:13px/1.5 var(--body)}.reader.high{background:#fff;color:#101010}.header{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px 10px;padding:12px;flex:none;border-bottom:4px solid var(--line);background:var(--surface)}.header>div{min-width:0}.header .heading{grid-column:1;grid-row:1}.panel-close{grid-column:2;grid-row:1;margin:0;width:32px;height:32px;padding:0;font-size:20px}.reader-hint{grid-column:1;grid-row:2;margin:0}.playgrounds-open{grid-column:2;grid-row:2;margin:0}.reader.playground-mode .reader-hint,.reader.playground-mode>.content,.reader.playground-mode>.status{display:none}.reader.playground-mode .playgrounds-open{grid-column:1/-1;justify-self:start;padding:4px 0;border:0;background:transparent;color:var(--accent)}.heading{display:flex;align-items:center;gap:8px}.brand-mark{display:block;flex:none;width:24px;height:24px}.brand-mark svg{display:block;width:100%;height:100%}h2{font:900 16px/1.2 var(--mono);text-transform:uppercase;letter-spacing:-.5px;margin:0}small{display:block;color:var(--muted);font-size:11px;margin-top:6px}button{margin-left:auto;flex:none;background:var(--paper);border:2px solid var(--line);color:inherit;cursor:pointer;padding:7px 9px;font:700 11px/1.4 var(--mono)}button:hover{background:var(--surface)}.content:focus-visible{outline:3px solid var(--accent);outline-offset:-5px}.content{padding:20px 22px 28px;overflow:auto;overscroll-behavior:contain;flex:1;min-height:0;font:var(--reader-font,20px) var(--body);user-select:text}.line{margin:0;line-height:var(--reader-spacing,2.8);white-space:pre-wrap;overflow-wrap:anywhere}ruby{ruby-position:over;ruby-align:center}rt{font:var(--reader-ruby,.5em)/1 var(--body)}.empty{font:13px/1.6 var(--body);color:var(--muted)}.status{margin:0;padding:12px 16px;border-top:2px solid var(--line);background:var(--surface);color:var(--muted);font:10px/1.6 var(--mono)}@media print{:host{display:none!important}}
+.reader{height:100%;display:flex;flex-direction:column;background:var(--paper);color:var(--ink);border:2px solid var(--line);overflow:hidden;font:13px/1.5 var(--body)}.reader.high{background:#fff;color:#101010}.header{display:grid;grid-template-columns:minmax(0,1fr) auto 28px;align-items:center;gap:6px 8px;padding:12px;flex:none;border-bottom:4px solid var(--line);background:var(--surface)}.header>div{min-width:0}.header .heading{grid-column:1;grid-row:1}.panel-close{grid-column:3;grid-row:1;justify-self:end;margin:0;width:28px;height:28px;padding:0;font-size:18px}.reader-hint{grid-column:1/-1;grid-row:2;margin:0}.playgrounds-open{grid-column:2;grid-row:1;display:inline-flex;align-items:center;gap:4px;margin:0;min-height:28px;padding:4px 6px;font-size:10px;background:var(--accent);color:var(--paper);white-space:nowrap}.playgrounds-open:hover{background:var(--ink)}.playgrounds-open svg{display:block;flex:none;width:14px;height:14px}.reader.playground-mode .reader-hint,.reader.playground-mode>.content,.reader.playground-mode>.status{display:none}.reader.playground-mode .heading{grid-column:1/3}.reader.playground-mode .playgrounds-open svg{display:none}.reader.playground-mode .playgrounds-open{grid-column:1/-1;grid-row:2;justify-self:start;min-height:0;padding:4px 0;border:0;background:transparent;color:var(--accent)}.heading{display:flex;align-items:center;gap:8px}.brand-mark{display:block;flex:none;width:24px;height:24px}.brand-mark svg{display:block;width:100%;height:100%}h2{font:900 16px/1.2 var(--mono);text-transform:uppercase;letter-spacing:-.5px;margin:0}small{display:block;color:var(--muted);font-size:11px;margin-top:6px}button{margin-left:auto;flex:none;background:var(--paper);border:2px solid var(--line);color:inherit;cursor:pointer;padding:7px 9px;font:700 11px/1.4 var(--mono)}button:hover{background:var(--surface)}.content:focus-visible{outline:3px solid var(--accent);outline-offset:-5px}.content{padding:20px 22px 28px;overflow:auto;overscroll-behavior:contain;flex:1;min-height:0;font:var(--reader-font,20px) var(--body);user-select:text}.line{margin:0;line-height:var(--reader-spacing,2.8);white-space:pre-wrap;overflow-wrap:anywhere}ruby{ruby-position:over;ruby-align:center}rt{font:var(--reader-ruby,.5em)/1 var(--body)}.empty{font:13px/1.6 var(--body);color:var(--muted)}.status{margin:0;padding:12px 16px;border-top:2px solid var(--line);background:var(--surface);color:var(--muted);font:10px/1.6 var(--mono)}@media print{:host{display:none!important}}
 .word{display:inline;margin:0;padding:0;border:0;background:transparent;font:inherit;line-height:inherit;color:inherit;white-space:inherit;user-select:text}.word:hover,.word[aria-pressed=true]{background:var(--surface);color:var(--accent);text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:5px}.word:focus-visible{outline-offset:2px}.definition{flex:none;max-height:44%;overflow:auto;padding:16px;border-top:4px solid var(--line);background:var(--surface)}.high .definition{background:var(--paper)}.definition header{display:flex;align-items:center;gap:8px}.definition h3{font-size:20px;margin:0;overflow-wrap:anywhere}.definition h4{margin:14px 0 6px;font:800 11px/1.4 var(--mono);text-transform:uppercase}.definition p{margin:6px 0;overflow-wrap:anywhere}.definition ol{margin:6px 0;padding-left:20px}.definition a{color:var(--accent);text-underline-offset:3px}.definition .source{font-size:10px;color:var(--muted)}.definition .pronunciation{font-size:12px;color:var(--muted)}.definition .feedback{font-size:12px;color:var(--muted)}
 .resize{position:absolute;left:-6px;top:16px;bottom:16px;width:12px;cursor:ew-resize;touch-action:none}.resize:after{content:"";position:absolute;left:5px;top:0;bottom:0;width:3px;background:var(--line)}.resize:hover:after,.resize:focus-visible:after{background:var(--accent)}.resize:focus-visible{outline:3px solid var(--accent);outline-offset:0}.correction-form{margin-top:12px;padding-top:12px;border-top:2px solid var(--line)}.correction-form label{display:block;font-size:11px;font-weight:700;margin:8px 0}.correction-form input{display:block;width:100%;font:14px var(--body);color:var(--ink);background:var(--paper);padding:8px;border:2px solid var(--line);margin-top:6px}.correction-actions{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}.correction-actions button{margin:0;font-size:11px}.feedback[data-error=true]{color:var(--ink);font-weight:700;border-left:3px solid var(--line);padding-left:8px}.feedback[data-error=true]:before{content:"! "}
 .definition.exploring{max-height:70%}.definition.browsing{flex:1;min-height:0;max-height:none;padding:0;border-top:0;overflow:hidden;background:var(--paper)}.definition>header{position:sticky;top:-16px;z-index:1;padding:8px 0;background:var(--surface)}
 ${explorationStyles}
 ${playgroundBrowserStyles}
 
-</style><div class="resize" role="separator" tabindex="0" aria-label="Reading panel width" aria-orientation="vertical" aria-valuemin="280" aria-valuemax="720" aria-valuenow="420"></div><section class="reader" role="region" aria-label="K\u014D reading view"><header class="header"><div class="heading"><span class="brand-mark" aria-hidden="true">${'<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="K\u014D \xB7 \u8003 \u2014 think">\n  <title>K\u014D \xB7 \u8003 \u2014 think</title>\n  <rect x="2" y="2" width="124" height="124" fill="#242b2d"/>\n  <rect x="8" y="8" width="112" height="112" fill="#9f3e2d"/>\n  <path fill="#f4ecd8" fill-rule="evenodd" d="M56.07,56.03 L50.88,58.75 L39.25,63.93 L26.54,68.54 L20,70.55 L23.74,75.34 L26.83,80.99 L46.01,72.92 L41.91,82.89 L37.37,91.43 L50.66,93.24 L53.61,87.07 L84.46,87.07 L83.75,91.76 L83.11,93.87 L82.26,95.37 L80.68,96.26 L77.78,96.62 L74.12,96.62 L61.2,95.52 L63.25,101.17 L63.95,107.38 L75.24,107.93 L82.52,107.75 L86.55,107.19 L90.17,105.59 L92.72,102.92 L94.7,98.41 L96.2,91.58 L98.13,76.25 L91.06,76.62 L57.5,76.63 L58.64,73.4 L82.97,71.5 L103.54,68.46 L95.75,58.59 L88.55,60.59 L83.59,61.46 L63.1,63.62 L75.15,56.03 L98.23,56.04 L108,56.6 L108,44.63 L100.93,45.14 L88.92,45.2 L94.84,39.63 L104.49,29.16 L93.38,21.76 L89.49,27.88 L83.89,34.57 L83.89,27.55 L77.33,28.05 L66.61,28.12 L66.72,23.17 L67.18,20.05 L53.98,20.05 L54.55,28.12 L37.64,28.05 L31.2,27.55 L31.2,39.41 L37.5,39.07 L54.55,39.03 L54.55,45.2 L32.19,45.19 L22.28,44.63 L22.28,56.6 L35.09,56.03 Z M66.61,45.2 L66.61,39.03 L79.24,39.13 L72.12,45.2 Z"/>\n</svg>\n'}</span><h2>Reading view</h2></div><button type="button" class="panel-close" aria-label="Close reading view" title="Close reading view">\xD7</button><small class="reader-hint">Click a word to explore its reading.</small><button type="button" class="playgrounds-open" aria-expanded="false">Playgrounds</button></header><div class="content" tabindex="0" aria-label="Page reading text" lang="ja"></div><section class="definition" aria-label="Word details" aria-live="polite" hidden></section><p class="status" role="status" aria-live="polite"></p></section>`;
+</style><div class="resize" role="separator" tabindex="0" aria-label="Reading panel width" aria-orientation="vertical" aria-valuemin="280" aria-valuemax="720" aria-valuenow="420"></div><section class="reader" role="region" aria-label="K\u014D reading view"><header class="header"><div class="heading"><span class="brand-mark" aria-hidden="true">${'<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="K\u014D \xB7 \u8003 \u2014 think">\n  <title>K\u014D \xB7 \u8003 \u2014 think</title>\n  <rect x="2" y="2" width="124" height="124" fill="#242b2d"/>\n  <rect x="8" y="8" width="112" height="112" fill="#9f3e2d"/>\n  <path fill="#f4ecd8" fill-rule="evenodd" d="M56.07,56.03 L50.88,58.75 L39.25,63.93 L26.54,68.54 L20,70.55 L23.74,75.34 L26.83,80.99 L46.01,72.92 L41.91,82.89 L37.37,91.43 L50.66,93.24 L53.61,87.07 L84.46,87.07 L83.75,91.76 L83.11,93.87 L82.26,95.37 L80.68,96.26 L77.78,96.62 L74.12,96.62 L61.2,95.52 L63.25,101.17 L63.95,107.38 L75.24,107.93 L82.52,107.75 L86.55,107.19 L90.17,105.59 L92.72,102.92 L94.7,98.41 L96.2,91.58 L98.13,76.25 L91.06,76.62 L57.5,76.63 L58.64,73.4 L82.97,71.5 L103.54,68.46 L95.75,58.59 L88.55,60.59 L83.59,61.46 L63.1,63.62 L75.15,56.03 L98.23,56.04 L108,56.6 L108,44.63 L100.93,45.14 L88.92,45.2 L94.84,39.63 L104.49,29.16 L93.38,21.76 L89.49,27.88 L83.89,34.57 L83.89,27.55 L77.33,28.05 L66.61,28.12 L66.72,23.17 L67.18,20.05 L53.98,20.05 L54.55,28.12 L37.64,28.05 L31.2,27.55 L31.2,39.41 L37.5,39.07 L54.55,39.03 L54.55,45.2 L32.19,45.19 L22.28,44.63 L22.28,56.6 L35.09,56.03 Z M66.61,45.2 L66.61,39.03 L79.24,39.13 L72.12,45.2 Z"/>\n</svg>\n'}</span><h2>Reading view</h2></div><button type="button" class="playgrounds-open" aria-expanded="false" title="Open playgrounds"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true" focusable="false"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg><span>Playgrounds</span></button><button type="button" class="panel-close" aria-label="Close reading view" title="Close reading view">\xD7</button><small class="reader-hint">Click a word to see its meaning.</small></header><div class="content" tabindex="0" aria-label="Page reading text" lang="ja"></div><section class="definition" aria-label="Word details" aria-live="polite" hidden></section><p class="status" role="status" aria-live="polite"></p></section>`;
           this.resizeHandle = this.root.querySelector(".resize");
           const finish = () => {
             if (!this.resizeStart) return;
@@ -2388,7 +2381,8 @@ ${playgroundBrowserStyles}
           this.playground?.dispose();
           this.playground = void 0;
           this.playgroundLauncher.setAttribute("aria-expanded", "false");
-          this.playgroundLauncher.textContent = "Playgrounds";
+          this.playgroundLauncher.querySelector("span").textContent = "Playgrounds";
+          this.playgroundLauncher.title = "Open playgrounds";
           this.playgroundLauncher.removeAttribute("aria-label");
           this.host.classList.remove("playground-active");
           this.root.querySelector(".reader").classList.remove("playground-mode");
@@ -2440,7 +2434,8 @@ ${playgroundBrowserStyles}
           this.definition.setAttribute("aria-label", "Learning playground browser");
           this.definition.setAttribute("aria-live", "off");
           this.playgroundLauncher.setAttribute("aria-expanded", "true");
-          this.playgroundLauncher.textContent = "\u2190 Reading view";
+          this.playgroundLauncher.querySelector("span").textContent = "\u2190 Reading view";
+          this.playgroundLauncher.title = "Back to reading view";
           this.playgroundLauncher.setAttribute("aria-label", "Back to reading view");
           this.host.classList.add("playground-active");
           this.root.querySelector(".reader").classList.add("playground-mode");
@@ -2581,23 +2576,12 @@ ${playgroundBrowserStyles}
             }
           }
           if (/[\p{Script=Han}々]/u.test(surface)) this.correctionControls(surface, button.dataset.reading ?? "");
-          const lookup = document.createElement("button");
-          lookup.type = "button";
-          lookup.className = "online-lookup";
-          lookup.textContent = "Look up definitions online";
           const body = document.createElement("div");
           body.className = "definition-body";
-          body.setAttribute("aria-busy", "false");
-          const notice = document.createElement("p");
-          notice.className = "source";
-          notice.textContent = "Readings and exploration work offline. Online lookup sends only this dictionary form to Wiktionary.";
-          body.append(notice);
-          lookup.addEventListener("click", () => void this.lookupDefinitions(word, body, lookup, version));
-          this.definition.append(lookup, body);
-          if (this.definitions.has(word)) void this.lookupDefinitions(word, body, lookup, version);
+          this.definition.append(body);
+          void this.lookupDefinitions(word, body, version);
         }
-        async lookupDefinitions(word, body, lookup, version) {
-          lookup.disabled = true;
+        async lookupDefinitions(word, body, version) {
           body.setAttribute("aria-busy", "true");
           const loading = document.createElement("p");
           loading.className = "feedback";
@@ -2621,8 +2605,6 @@ ${playgroundBrowserStyles}
           body.replaceChildren();
           body.setAttribute("aria-busy", "false");
           const failed = result.en.page.status === "error" || result.ja.page.status === "error";
-          lookup.disabled = !failed;
-          lookup.textContent = failed ? "Retry definitions online" : "Definitions loaded";
           for (const language of ["en", "ja"]) {
             const { page, definitions } = result[language];
             const section = document.createElement("section");
@@ -2652,6 +2634,14 @@ ${playgroundBrowserStyles}
             source.rel = "noopener noreferrer";
             section.append(source);
             body.append(section);
+          }
+          if (failed) {
+            const retry = document.createElement("button");
+            retry.type = "button";
+            retry.className = "definition-retry";
+            retry.textContent = "Retry definitions online";
+            retry.addEventListener("click", () => void this.lookupDefinitions(word, body, version));
+            body.append(retry);
           }
           const notice = document.createElement("p");
           notice.className = "source";
@@ -2730,7 +2720,7 @@ ${playgroundBrowserStyles}
       var layer = shadow.querySelector("div");
       var mutationObserver;
       var watchedShadows = /* @__PURE__ */ new WeakSet();
-      var observerOptions = { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["style", "class", "aria-label", "data-font-css", "width", "height", "transform"] };
+      var observerOptions = { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["style", "class", "hidden", "open", "aria-label", "data-font-css", "width", "height", "transform"] };
       function observeShadow(root) {
         if (mutationObserver && !watchedShadows.has(root)) {
           watchedShadows.add(root);
@@ -3044,6 +3034,15 @@ ${playgroundBrowserStyles}
               const r = node.getBoundingClientRect();
               const style = getComputedStyle(node);
               if (style.display === "none" || style.visibility === "hidden" || r.width > 0 && r.height > 0 && !visible(r)) descend = false;
+            }
+            if (descend && !docs && node instanceof HTMLDetailsElement && !node.open) {
+              descend = false;
+              let summary = node.firstElementChild;
+              while (summary && !(summary instanceof HTMLElement && summary.localName === "summary")) {
+                yield void 0;
+                summary = summary.nextElementSibling;
+              }
+              if (summary) yield* sources(summary, panelMode);
             }
             if (descend && docs && node.matches("svg rect[aria-label]")) {
               source = docsSource(node);

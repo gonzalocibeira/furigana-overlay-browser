@@ -1,0 +1,19 @@
+{
+  "archive": "ko-japanese-reading-companion-1.1.0-chrome-web-store.zip",
+  "bytes": 15582079,
+  "sha256": "e16b4343b7a6b3cd73dd9209b49e229e5cf10f2f08d8a2f253f0ec2dde0cb767",
+  "files": 51,
+  "mismatches": [],
+  "tested_runtime_changes": [],
+  "manifest_at_root": true,
+  "development_files": [],
+  "manual_archive": {
+    "archive": "ko-japanese-reading-companion-1.1.0.zip",
+    "bytes": 15582629,
+    "sha256": "ae5c2995ea6e573a7a54de6633128117c88a30c35f094a9ef677a26c77fdce49",
+    "files": 51,
+    "manifest_in_dist": true,
+    "same_runtime": true
+  },
+  "release_tag": "v1.1.0"
+}

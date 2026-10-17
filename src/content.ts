@@ -16,7 +16,7 @@ shadow.innerHTML = `<style>:host{all:initial!important;position:fixed!important;
 const layer = shadow.querySelector('div')!;
 let mutationObserver: MutationObserver | undefined;
 const watchedShadows = new WeakSet<ShadowRoot>();
-const observerOptions: MutationObserverInit = {subtree:true, childList:true, characterData:true, attributes:true, attributeFilter:['style','class','aria-label','data-font-css','width','height','transform']};
+const observerOptions: MutationObserverInit = {subtree:true, childList:true, characterData:true, attributes:true, attributeFilter:['style','class','hidden','open','aria-label','data-font-css','width','height','transform']};
 function observeShadow(root: ShadowRoot) {
   if (mutationObserver && !watchedShadows.has(root)) { watchedShadows.add(root); mutationObserver.observe(root,observerOptions); }
 }
@@ -252,6 +252,17 @@ function* sources(root: Element,panelMode=false): Generator<Source | undefined> 
         const r = node.getBoundingClientRect();
         const style = getComputedStyle(node);
         if (style.display === 'none' || style.visibility === 'hidden' || (r.width > 0 && r.height > 0 && !visible(r))) descend = false;
+      }
+      // Native disclosures can retain measurable descendant rectangles while
+      // closed. Only their first direct summary is rendered; prune everything
+      // else before measuring text, including nested disclosures and shadows.
+      if (descend && !docs && node instanceof HTMLDetailsElement && !node.open) {
+        descend = false;
+        let summary = node.firstElementChild;
+        while (summary && !(summary instanceof HTMLElement && summary.localName === 'summary')) {
+          yield undefined;summary = summary.nextElementSibling;
+        }
+        if (summary) yield* sources(summary,panelMode);
       }
       if (descend && docs && node.matches('svg rect[aria-label]')) { source = docsSource(node); descend = false; }
       if (descend && !docs && node.shadowRoot) { observeShadow(node.shadowRoot); yield* sources(node.shadowRoot as unknown as Element,panelMode); }

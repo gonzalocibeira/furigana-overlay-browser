@@ -3,6 +3,7 @@ import kuromoji from 'kuromoji';
 import {buildVerbPlayground,createVerbPlayground,dictionaryVerbCandidates,potentialBaseQueries,resolvePotentialBase,isRaDroppedPotential,restrictVerbBase,verbBaseText,verbFamilies,type VerbBase,type VerbFamilyId,type VerbPlayground,type VerbState} from '../src/verb-playground';
 import {reviewedVerbExamples} from './fixtures/verb-examples';
 import {hiragana,type Word} from '../src/shared';
+import {verifiedVerbInterpretations} from '../src/exploration';
 
 let tokenizer:kuromoji.Tokenizer<kuromoji.IpadicFeatures>;
 test.beforeAll(async()=>{
@@ -226,5 +227,36 @@ test('verified ら抜き dictionary entries are rejected as potential bases with
   for(const input of ['食べる','読める','切れる']) {
     const base=dictionaryVerbCandidates(input,analyze(input))[0];
     expect(potentialBaseQueries(base).some(query=>isRaDroppedPotential(base,query,analyze(query))),input).toBe(false);
+  }
+});
+
+test('lexical kana homographs retain their forms without unsupported potential interpretations',async()=>{
+  const tokenize=async(texts:string[])=>texts.map(analyze);
+  for(const input of ['いれる','入れる','あれる','荒れる']) {
+    const [base]=dictionaryVerbCandidates(input,analyze(input));
+    expect(base,input).toBeDefined();
+    const choices=await verifiedVerbInterpretations(createVerbPlayground(base),tokenize,new AbortController().signal);
+    expect(choices,input).toHaveLength(1);
+    expect(choices[0].model.base).toEqual(base);
+    expect(new Set(choices[0].model.forms.map(value=>value.family)).size,input).toBe(18);
+  }
+  const [rough]=dictionaryVerbCandidates('あれる',analyze('あれる'));
+  expect(resolvePotentialBase(rough,'ある',analyze('ある'))).toBeUndefined();
+  for(const source of ['いれた','いれている','あれていた']) {
+    const model=explore(source)!;
+    expect(model,source).toBeDefined();
+    const choices=await verifiedVerbInterpretations(model,tokenize,new AbortController().signal);
+    expect(choices,source).toHaveLength(1);
+    expect(choices[0].model.source).toBe(source);
+    expect(choices[0].model.initial).toEqual(model.initial);
+    expect(new Set(choices[0].model.forms.map(value=>value.family)).size,source).toBe(18);
+  }
+  for(const input of ['みれる','見れる','来れる']) {
+    const [base]=dictionaryVerbCandidates(input,analyze(input));
+    expect(await verifiedVerbInterpretations(createVerbPlayground(base),tokenize,new AbortController().signal),input).toEqual([]);
+  }
+  for(const input of ['食べれる','これる']) {
+    expect(dictionaryVerbCandidates(input,analyze(input)),input).toEqual([]);
+    expect(explore(input),input).toBeUndefined();
   }
 });

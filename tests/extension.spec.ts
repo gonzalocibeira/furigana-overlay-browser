@@ -408,13 +408,14 @@ test('Docs pageless reading view starts automatically, ignores offscreen text, a
   await settings({docsReadingView:{enabled:false,spacing:2.8}});await page.close();
 });
 
-test('Docs explicit online lookups show bilingual definitions, use lemmas, cache results, and handle failures and stale lookups',async()=>{
+test('Docs word activation automatically shows bilingual definitions, uses lemmas, caches results, and handles failures and stale lookups',async()=>{
   const lookups:string[]=[];
+  let libraryFails=true;
   await context.route('https://*.wiktionary.org/w/api.php*',async route=>{
     const url=new URL(route.request().url()),word=url.searchParams.get('page')!,ja=url.hostname.startsWith('ja.');
     lookups.push(`${ja?'ja':'en'}:${word}`);
     if(word==='未知') {await route.fulfill({json:{error:{code:'missingtitle'}}});return;}
-    if(word==='図書館' && ja) {await route.abort();return;}
+    if(word==='図書館' && ja && libraryFails) {await route.abort();return;}
     if(word==='食べる')await new Promise(resolve=>setTimeout(resolve,500));
     const language=ja?'日本語':'Japanese',pos=ja?'名詞':'Noun';
     // Include other languages, nested examples, references, and untrusted markup.
@@ -434,8 +435,6 @@ test('Docs explicit online lookups show bilingual definitions, use lemmas, cache
     // A native keyboard click should work through the closed shadow root.
     await readerEval(page,`function(){this.querySelector('[data-surface="学校"]').focus()}`);
     await page.keyboard.press('Enter');
-    expect(lookups).toEqual([]);
-    await readerEval(page,`function(){this.querySelector('.online-lookup').click()}`);
     const snapshot=`function(){return {hidden:this.querySelector('.definition').hidden,text:this.querySelector('.definition').textContent,busy:this.querySelector('.definition-body')?.getAttribute('aria-busy'),selected:this.querySelector('.word[aria-pressed="true"]')?.dataset.surface,links:Array.from(this.querySelectorAll('.definition a'),a=>a.href),unsafe:this.querySelectorAll('.definition script,.definition img,.definition iframe').length}}`;
     await expect.poll(async()=> (await readerEval(page,snapshot))?.text).toContain('A place for learning & study. safe text');
     const result=await readerEval(page,snapshot);
@@ -443,20 +442,35 @@ test('Docs explicit online lookups show bilingual definitions, use lemmas, cache
     expect(result.text).not.toMatch(/Wrong|Hidden|alert/);expect(result.unsafe).toBe(0);expect(result.busy).toBe('false');expect(result.selected).toBe('学校');
     expect(result.links).toEqual([`https://en.wiktionary.org/wiki/${encodeURIComponent('学校')}#Japanese`,`https://ja.wiktionary.org/wiki/${encodeURIComponent('学校')}#${encodeURIComponent('日本語')}`]);
     expect(lookups.sort()).toEqual(['en:学校','ja:学校']);
+    expect(await readerEval(page,`function(){return !!this.querySelector('.online-lookup,.definition-retry') || this.querySelector('.definition').textContent.includes('Look up definitions online')}`)).toBe(false);
     await page.screenshot({path:test.info().outputPath('docs-word-definitions.png')});
     await page.keyboard.press('Escape');expect((await readerEval(page,snapshot)).hidden).toBe(true);
     expect(await readerEval(page,`function(){return this.activeElement?.dataset.surface}`)).toBe('学校');
-    const click=async(surface:string)=>readerEval(page,`function(){this.querySelector('[data-surface="${surface}"]').click();this.querySelector('.online-lookup:not(:disabled)')?.click()}`);
+    const click=async(surface:string)=>readerEval(page,`function(){this.querySelector('[data-surface="${surface}"]').click()}`);
     await click('学校');expect((await readerEval(page,snapshot)).text).toContain('A place for learning');expect(lookups).toHaveLength(2);
     await click('食べ');await expect.poll(()=>lookups.includes('en:食べる')).toBe(true);
+    expect((await readerEval(page,snapshot)).busy).toBe('true');
+    expect((await readerEval(page,snapshot)).text).toContain('Looking up English and Japanese definitions');
+    expect(await readerEval(page,`function(){return !!this.querySelector('.online-lookup,.definition-retry')}`)).toBe(false);
     await click('学校');await page.waitForTimeout(650);expect((await readerEval(page,snapshot)).selected).toBe('学校');
+    await readerEval(page,`function(){this.querySelector('[data-surface="ありがとう"]').focus()}`);
+    await page.keyboard.press('Space');
+    await expect.poll(async()=> (await readerEval(page,snapshot))?.busy).toBe('false');
+    expect((await readerEval(page,snapshot)).selected).toBe('ありがとう');
+    expect(lookups.filter(word=>word.endsWith(':ありがとう')).sort()).toEqual(['en:ありがとう','ja:ありがとう']);
     await click('未知');await expect.poll(async()=> (await readerEval(page,snapshot))?.text).toContain('No English definition found');
     expect((await readerEval(page,snapshot)).text).toContain('日本語の定義が見つかりません');
+    expect(await readerEval(page,`function(){return !!this.querySelector('.definition-retry')}`)).toBe(false);
     await click('図書館');await expect.poll(async()=> (await readerEval(page,snapshot))?.text).toContain('接続を確認');
     expect((await readerEval(page,snapshot)).text).toContain('A place for learning');
     const requestsBeforeRetry=lookups.length;
-    await click('図書館');await expect.poll(()=>lookups.length).toBeGreaterThan(requestsBeforeRetry);
+    libraryFails=false;
+    await readerEval(page,`function(){this.querySelector('.definition-retry').click()}`);
+    await expect.poll(()=>lookups.length).toBe(requestsBeforeRetry+2);
     await expect.poll(async()=> (await readerEval(page,snapshot))?.busy).toBe('false');
+    expect((await readerEval(page,snapshot)).text).toContain('学ぶための施設。');
+    expect(await readerEval(page,`function(){return !!this.querySelector('.online-lookup,.definition-retry')}`)).toBe(false);
+    await click('学校');await click('図書館');expect(lookups).toHaveLength(requestsBeforeRetry+2);
     expect(await page.locator('.kix-appview-editor').innerHTML()).toBe(before);
     await click('食べ');
     await page.locator('rect').first().evaluate(el=>el.setAttribute('aria-label','先生です。'));
@@ -481,7 +495,7 @@ test('Docs panel debounces edits and preserves text, scroll, focus, and definiti
     await page.route('https://docs.google.com/document/d/debounce/edit',route=>route.fulfill({contentType:'text/html',body:`<!doctype html><meta charset="utf-8"><style>body{margin:0}.kix-appview-editor{position:absolute;top:100px;width:900px;height:600px}</style><div id="toolbar">Saved</div><div class="kix-appview-editor"><svg width="900" height="600"><g data-font-css="24px system-ui" fill="none">${Array.from({length:15},(_,i)=>`<rect x="40" y="${40+i*32}" width="300" height="28" aria-label="学校で日本語を勉強する。"/>`).join('')}</g></svg></div>`}));
     await page.goto('https://docs.google.com/document/d/debounce/edit');
     await expect.poll(async()=> (await readerEval(page,readerSnapshot))?.readings,{timeout:30000}).toContain('がっこう');
-    await readerEval(page,`function(){this.querySelector('[data-surface="学校"]').click();this.querySelector('.online-lookup').click()}`);
+    await readerEval(page,`function(){this.querySelector('[data-surface="学校"]').click()}`);
     await expect.poll(()=>readerEval(page,`function(){return this.querySelector('.definition-body')?.getAttribute('aria-busy')}`)).toBe('false');
     await readerEval(page,`function(){
       const content=this.querySelector('.content'),word=this.querySelector('[data-surface="学校"]');word.focus();content.scrollTop=100;
@@ -562,9 +576,9 @@ test('web panel definitions and offline corrections update effective readings an
   await expect.poll(async()=> (await readerEval(page,readerSnapshot))?.readings,{timeout:30000}).toContain('にほんご');
   const open=`function(){this.querySelector('[data-surface="日本語"]').click();Array.from(this.querySelectorAll('.definition button')).find(b=>b.textContent==='Correct reading').click();return Array.from(this.querySelectorAll('.correction-form input'),i=>i.value)}`;
   expect(await readerEval(page,open)).toEqual(['日本語','にほんご']);
-  expect(requested).toEqual([]);
-  await readerEval(page,`function(){this.querySelector('.online-lookup').click()}`);
   await expect.poll(()=>requested.length).toBe(2);
+  await expect.poll(()=>readerEval(page,`function(){return this.querySelector('.definition-body')?.getAttribute('aria-busy')}`)).toBe('false');
+  expect(await readerEval(page,`function(){return this.querySelector('.definition-body').textContent}`)).toContain('Could not load definitions');
   await readerEval(page,`function(){const inputs=this.querySelectorAll('.correction-form input');inputs[1].value='abc';this.querySelector('.correction-form').requestSubmit();}`);
   await expect.poll(()=>readerEval(page,`function(){return this.querySelector('.correction-form .feedback').textContent}`)).toContain('hiragana or katakana');
   await readerEval(page,`function(){const inputs=this.querySelectorAll('.correction-form input');inputs[1].value='ニッポンゴ';inputs[1].dispatchEvent(new Event('input',{bubbles:true,composed:true}));this.querySelector('.correction-form').requestSubmit();}`);
@@ -658,4 +672,46 @@ test('web panel clips offscreen wrapped text, preserves hard breaks and shadow o
   expect(snapshot.lines.indexOf('順序二。')).toBeGreaterThan(snapshot.lines.indexOf('順序一。'));
   for(const frame of page.frames())if(frame!==page.mainFrame())await expect(frame.locator('ko-reading-view')).toHaveCount(0);
   await page.close();await settings({readingView:{...webPanelSettings,sites:{}}});
+});
+
+for(const panel of [false,true])test(`${panel?'reading panel':'overlays'} follow hidden attributes and nested native disclosure visibility`,async()=>{
+  await settings({enabled:true,excluded:[],readingOverrides:{},readingView:{...webPanelSettings,sites:panel?webPanelSettings.sites:{}}});
+  const page=await context.newPage();
+  try {
+    await page.route(`${base}/native-visibility`,route=>route.fulfill({contentType:'text/html; charset=utf-8',body:`<!doctype html><meta charset="utf-8"><style>body{margin:60px;font:24px/3 system-ui}main{width:400px}p{margin:0}</style><main id="source"><p id="hide">学校</p><details id="outer"><summary>日本語</summary><p>図書館</p><details id="inner"><summary>東京</summary><p>京都</p></details></details><details><summary>大学</summary><summary>病院</summary><p>本</p></details><div id="shadow"></div></main>`}));
+    await page.goto(`${base}/native-visibility`);
+    await page.locator('#shadow').evaluate(el=>{
+      const root=el.attachShadow({mode:'open'});
+      root.innerHTML='<details id="shadow-details"><summary><span id="summary-shadow"></span></summary><p>映画</p></details>';
+      root.querySelector('#summary-shadow')!.attachShadow({mode:'open'}).innerHTML='<span>新聞</span>';
+      document.dispatchEvent(new Event('scroll'));
+    });
+    const source=await page.locator('#source').innerHTML();
+    const readings=async()=>panel?(await readerEval(page,readerSnapshot))?.readings ?? []:(await annotations(page)).map(a=>a.text);
+    const initial=['がっこう','にほんご','だいがく','しんぶん'];
+    const expectReadings=async(values:string[])=>{
+      await expect.poll(async()=> (await readings()).sort(),{timeout:30000}).toEqual([...values].sort());
+    };
+    await expectReadings(initial);
+
+    // Attribute changes alone must invalidate the snapshot, without scrolling.
+    await page.locator('#hide').evaluate((el:HTMLElement)=>el.hidden=true);
+    await expectReadings(initial.filter(value=>value!=='がっこう'));
+    await page.locator('#hide').evaluate((el:HTMLElement)=>el.hidden=false);
+    await expectReadings(initial);
+    await page.locator('#outer').evaluate((el:HTMLDetailsElement)=>el.open=true);
+    await expectReadings([...initial,'としょかん','とうきょう']);
+    await page.locator('#inner').evaluate((el:HTMLDetailsElement)=>el.open=true);
+    await expectReadings([...initial,'としょかん','とうきょう','きょうと']);
+    await page.locator('#outer').evaluate((el:HTMLDetailsElement)=>el.open=false);
+    await expectReadings(initial);
+    await page.locator('#shadow').evaluate(el=>(el.shadowRoot!.querySelector('#shadow-details') as HTMLDetailsElement).open=true);
+    await expectReadings([...initial,'えいが']);
+    await page.locator('#shadow').evaluate(el=>(el.shadowRoot!.querySelector('#shadow-details') as HTMLDetailsElement).open=false);
+    await expectReadings(initial);
+    await page.locator('#inner').evaluate((el:HTMLDetailsElement)=>el.open=false);
+    expect(await page.locator('#source').innerHTML()).toBe(source);
+  } finally {
+    await page.close();await settings({readingView:{...webPanelSettings,sites:{}}});
+  }
 });

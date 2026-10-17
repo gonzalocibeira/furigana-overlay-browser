@@ -1,6 +1,6 @@
 # Kō — Japanese Reading Companion: Privacy Policy
 
-Effective date: 16 October 2026. Developer: Gonzalo Cibeira.
+Effective date: 17 October 2026. Developer: Gonzalo Cibeira.
 
 Kō adds Japanese readings to webpages and Google Docs, with an optional reading panel, local exploration tools, and online word definitions. It has no account system, advertising, analytics, telemetry, or developer-operated data server.
 
@@ -14,9 +14,9 @@ The Google Docs bridge sets Google's canvas annotation flag using the extension'
 
 ## Optional online word definitions
 
-Choosing Look up definitions online in the reading panel sends the selected word's dictionary form to both English Wiktionary (en.wiktionary.org) and Japanese Wiktionary (ja.wiktionary.org), operated by the Wikimedia Foundation. Opening word details or local playgrounds does not request definitions. A selected word may itself contain personal information, such as a name. Only that lookup term is sent by Kō; the surrounding text and page URL are not sent. Requests use HTTPS, omit credentials and cookies, omit the referrer, and do not follow redirects. Wikimedia receives the term and normal connection information, including your IP address. Its handling of this information is governed by the [Wikimedia Foundation Privacy Policy](https://foundation.wikimedia.org/wiki/Policy:Privacy_policy).
+Clicking a word in the reading panel, or activating it with Enter or Space, automatically requests its definitions by sending the selected word's dictionary form to both English Wiktionary (en.wiktionary.org) and Japanese Wiktionary (ja.wiktionary.org), operated by the Wikimedia Foundation. A selected word may itself contain personal information, such as a name. Only that lookup term is sent by Kō; the surrounding text and page URL are not sent. Requests use HTTPS, omit credentials and cookies, omit the referrer, and do not follow redirects. Wikimedia receives the term and normal connection information, including your IP address. Its handling of this information is governed by the [Wikimedia Foundation Privacy Policy](https://foundation.wikimedia.org/wiki/Policy:Privacy_policy).
 
-Furigana and exploration do not require these requests. Definitions are requested only through the online lookup button, and cached results may avoid another request. Following a Wiktionary source link, an exploration reference link, or another external link opens that website in a new tab, where its own privacy practices and your browser settings apply.
+Furigana and exploration do not require these requests. Definitions are requested only when you activate a reading-panel word or retry a failed lookup; cached results may avoid another request. Opening the Playgrounds browser and using exploration controls makes no definition requests. Following a Wiktionary source link, an exploration reference link, or another external link opens that website in a new tab, where its own privacy practices and your browser settings apply.
 
 ## Local exploration
 

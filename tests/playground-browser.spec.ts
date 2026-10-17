@@ -126,6 +126,33 @@ test('typed いる and verified fused potential bases require explicit choices w
   } finally {await page.close();}
 });
 
+test('lexical kana homographs open typed and page-selected playgrounds',async()=>{
+  const page=await browser.newPage();
+  try {
+    await setup(page);
+    for(const [input,potential] of [['いれる','いれられる'],['あれる','あれられる']]) {
+      await checkVerb(page,input);
+      await expect(page.locator('.playground-confirmation button')).toHaveCount(1);
+      await expect(page.locator('.playground-confirmation')).not.toContainText('limited forms');
+      await page.locator('.playground-confirmation button').click();
+      await expect.poll(()=>plain(page)).toBe(input);
+      await page.getByLabel('Verb form').selectOption('potential');
+      await expect.poll(()=>plain(page)).toBe(potential);
+    }
+    await page.evaluate(words=>{
+      const m=(window as any).playgroundModule;
+      const panel=m.renderExplorations(m.wordExplorations('いれた',words,0,'いれ',{}),{tokenize:(texts:string[])=>(window as any).analyzeLocal(texts)});
+      panel.hidden=false;document.querySelector('.playground-selection')!.replaceChildren(panel);
+    },analyze('いれた'));
+    await expect(page.locator('.verb-playground')).toBeVisible();
+    await expect.poll(()=>plain(page)).toBe('いれた');
+    await page.getByLabel('Past',{exact:true}).uncheck();
+    await expect.poll(()=>plain(page)).toBe('いれる');
+    await page.getByRole('button',{name:'Reset',exact:true}).click();
+    await expect.poll(()=>plain(page)).toBe('いれた');
+  } finally {await page.close();}
+});
+
 test('ambiguous られる has no assigned interpretation until chosen, and Reset restores the choice gate',async()=>{
   const page=await browser.newPage();
   try {

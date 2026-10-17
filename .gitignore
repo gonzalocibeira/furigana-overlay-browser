@@ -7,3 +7,7 @@ playwright-report/
 .env
 .env.*
 !.env.example
+
+# Local store-dashboard capture includes account details.
+docs/screenshots/store-submission-1.1.0.png
+dist/docs/screenshots/store-submission-1.1.0.png

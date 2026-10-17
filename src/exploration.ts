@@ -30,7 +30,7 @@ export function wordExplorations(text:string, words:Word[], wordIndex:number, su
 }
 
 export const explorationStyles=`
-.explore-toggle,.online-lookup{margin:8px 8px 0 0;font-size:11px}
+.explore-toggle,.definition-retry{margin:8px 8px 0 0;font-size:11px}
 .explore-panel{margin-top:12px;border:1px solid var(--line);padding:12px;background:var(--paper);min-width:0}
 .explore-panel[hidden]{display:none}.explore-tools{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
 .explore-tools button{margin:0;font-size:10px}.explore-tools button[aria-pressed=true]{background:var(--accent);color:var(--paper)}
@@ -49,7 +49,7 @@ export const explorationStyles=`
 .verb-result .verb-state{font-size:11px;color:var(--muted);margin:4px 0 0}
 .verb-reset{margin:0;padding:4px 8px;font-size:11px;background:var(--paper)}
 .explore-panel a{font-size:11px;overflow-wrap:anywhere}
-.explore-panel button:focus-visible,.explore-panel input:focus-visible,.explore-toggle:focus-visible,.online-lookup:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.explore-panel button:focus-visible,.explore-panel input:focus-visible,.explore-toggle:focus-visible,.definition-retry:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .verb-family-label{display:grid;gap:6px;font-size:12px;font-weight:600;margin:14px 0 0}
 .verb-family{width:100%;min-width:0;max-width:100%;font:13px/1.5 var(--body);padding:9px;background:var(--paper);color:var(--ink);border:1px solid var(--line)}
 .verb-explanation{color:var(--muted);font:12px/1.6 var(--body);margin:12px 0}
